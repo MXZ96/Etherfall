@@ -4,7 +4,7 @@
    ES Modules only; no global state.
    ========================================================================== */
 
-import Phaser from "phaser";
+import * as Phaser from "phaser";
 import { GAME_CONFIG } from "./src/config/GameConfig.js";
 
 import BootScene from "./src/scenes/BootScene.js";

@@ -8,6 +8,7 @@
    data/enemy.json (speed, hp, attack patterns, affinities, etc.).
    ========================================================================== */
 
+import * as Phaser from "phaser";
 import { ENEMY, TEXTURE_KEYS } from "../config/constants.js";
 
 export class Enemy extends Phaser.Physics.Arcade.Sprite {

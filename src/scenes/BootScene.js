@@ -5,7 +5,7 @@
    hands off to the PreloadScene.
    ========================================================================== */
 
-import Phaser from "phaser";
+import * as Phaser from "phaser";
 import { SCENES, TEXTURE_KEYS } from "../config/constants.js";
 import { SaveSystem } from "../systems/SaveSystem.js";
 import { SettingsSystem } from "../systems/SettingsSystem.js";

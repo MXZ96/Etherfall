@@ -4,7 +4,7 @@
    pause menu during play.)
    ========================================================================== */
 
-import Phaser from "phaser";
+import * as Phaser from "phaser";
 import { GAME, SCENES } from "../config/constants.js";
 
 export class MainMenuScene extends Phaser.Scene {

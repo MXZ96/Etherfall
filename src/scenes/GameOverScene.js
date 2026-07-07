@@ -4,7 +4,7 @@
    Displays the level reached and returns to the menu.
    ========================================================================== */
 
-import Phaser from "phaser";
+import * as Phaser from "phaser";
 import { GAME, SCENES } from "../config/constants.js";
 
 export class GameOverScene extends Phaser.Scene {

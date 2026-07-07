@@ -5,6 +5,7 @@
    Future: gamepad / touch joystick can feed the same getMoveVector() shape.
    ========================================================================== */
 
+import * as Phaser from "phaser";
 import { normalize } from "../utils/math.js";
 
 export class InputManager {

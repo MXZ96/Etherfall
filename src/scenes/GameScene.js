@@ -11,7 +11,7 @@
    Persistent managers (save/settings/audio) come from the registry.
    ========================================================================== */
 
-import Phaser from "phaser";
+import * as Phaser from "phaser";
 import {
   CAMERA,
   GAME,

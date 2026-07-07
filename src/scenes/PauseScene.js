@@ -4,7 +4,7 @@
    or quits to the main menu. Reads settings/audio from the registry.
    ========================================================================== */
 
-import Phaser from "phaser";
+import * as Phaser from "phaser";
 import { GAME, SCENES } from "../config/constants.js";
 
 export class PauseScene extends Phaser.Scene {

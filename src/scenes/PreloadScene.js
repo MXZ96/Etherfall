@@ -5,7 +5,7 @@
    Shows a minimal loading indicator.
    ========================================================================== */
 
-import Phaser from "phaser";
+import * as Phaser from "phaser";
 import { GAME, SCENES } from "../config/constants.js";
 
 const DATA_FILES = [

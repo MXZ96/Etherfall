@@ -8,6 +8,7 @@
    v0.0.1 there is NO damage handling yet (per scope).
    ========================================================================== */
 
+import * as Phaser from "phaser";
 import { PLAYER, TEXTURE_KEYS } from "../config/constants.js";
 
 export class Player extends Phaser.Physics.Arcade.Sprite {
