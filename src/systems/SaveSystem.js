@@ -25,8 +25,14 @@ function defaultSave() {
       fullscreen: false,
       language: "en",
     },
-    // Reserved for future systems.
-    progress: {},
+    // Reserved for future systems. Shape prepared now (v0.0.5.1) so later
+    // versions can populate it without a save migration; not yet written.
+    progress: {
+      highestLevel: 1,
+      unlockedElements: [],
+      discoveredSpells: [],
+      achievements: [],
+    },
   };
 }
 
@@ -77,6 +83,18 @@ export class SaveSystem {
       return true;
     } catch (err) {
       console.warn("[SaveSystem] Failed to write save.", err);
+      return false;
+    }
+  }
+
+  /**
+   * True only when a real save document exists in storage. Used by the main
+   * menu to decide whether the "Continue" button should appear.
+   */
+  hasSave() {
+    try {
+      return !!localStorage.getItem(this.storageKey);
+    } catch (err) {
       return false;
     }
   }

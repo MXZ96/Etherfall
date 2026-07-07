@@ -3,10 +3,12 @@
    Overlay shown when the player levels up. It pauses the game and presents
    three rarity-weighted upgrade choices (rolled by UpgradeSystem). Selecting a
    card applies that upgrade immediately (raising the spell's level) and resumes
-   play. If no choices are available it falls back to a Continue button.
+   play.
 
    Fully data-driven: the cards are built from the `choices` array passed to
-   show(); no upgrade logic lives here.
+   show(); no upgrade logic lives here. The only way to dismiss the overlay is
+   by picking one of the upgrade cards, so there is no separate "Continue"
+   button cluttering the screen.
    ========================================================================== */
 
 import { GAME } from "../config/constants.js";
@@ -52,21 +54,6 @@ export class LevelUpUI {
     // Cards are created lazily per show() (count/contents vary).
     this.cards = [];
 
-    // Fallback continue button (used when there are no upgrade choices).
-    this.continueBtn = scene.add.rectangle(cx, cy + 240, 220, 56, 0x3a2d63)
-      .setScrollFactor(0).setDepth(2001).setInteractive({ useHandCursor: true });
-    this.continueLabel = scene.add.text(cx, cy + 240, "CONTINUE", {
-      fontFamily: "Segoe UI, sans-serif",
-      fontSize: "20px",
-      color: "#e6e8ef",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(2002);
-
-    this.continueBtn.on("pointerdown", () => {
-      if (!this.visible || this.continueBtn.visible) this.hide();
-    });
-    this.continueBtn.on("pointerover", () => { if (this.continueBtn.visible) this.continueBtn.setFillStyle(0x4a3a7a); });
-    this.continueBtn.on("pointerout", () => { if (this.continueBtn.visible) this.continueBtn.setFillStyle(0x3a2d63); });
-
     this.hide();
   }
 
@@ -84,7 +71,10 @@ export class LevelUpUI {
 
     const cx = GAME.WIDTH / 2;
     const cy = GAME.HEIGHT / 2;
-    const startX = cx - (CARD_W * choices.length + CARD_GAP * (choices.length - 1)) / 2;
+    // `x` below is each card's CENTER (rectangles default to origin 0.5), so the
+    // first card's center must sit half a card-width in from the row's left edge.
+    const totalWidth = CARD_W * choices.length + CARD_GAP * (choices.length - 1);
+    const startX = cx - totalWidth / 2 + CARD_W / 2;
 
     choices.forEach((choice, i) => {
       const x = startX + i * (CARD_W + CARD_GAP);
@@ -157,7 +147,9 @@ export class LevelUpUI {
   }
 
   /**
-   * Show the overlay.
+   * Show the overlay. The overlay is dismissed only by picking a card, so the
+   * caller MUST always provide at least one choice (the player always owns at
+   * least Fireball). If somehow no choices exist, we resume immediately.
    * @param {number} level
    * @param {object[]} choices  upgrade choices (see GameScene.onLevelUp)
    * @param {Function} onSelect invoked with the chosen card when a card is picked
@@ -167,17 +159,18 @@ export class LevelUpUI {
     this.selected = null;
     this.title.setText(`LEVEL UP  -  LVL ${level}`);
 
-    const hasChoices = choices && choices.length > 0;
-    if (hasChoices) {
-      this.buildCards(choices);
-      this.cards.forEach((c, i) => { c.choice = choices[i]; });
-    } else {
-      this.buildCards([]);
-    }
+    const safeChoices = choices && choices.length > 0 ? choices : [];
+    this.buildCards(safeChoices);
+    safeChoices.forEach((c, i) => { this.cards[i].choice = c; });
 
-    // Continue button only when there is nothing to pick.
-    this.continueBtn.setVisible(!hasChoices);
-    this.continueLabel.setVisible(!hasChoices);
+    if (safeChoices.length === 0) {
+      // No upgrades to offer (shouldn't happen): just resume the run.
+      this.setVisible(false);
+      const cb = this.onSelect;
+      this.onSelect = null;
+      if (cb) cb(null);
+      return;
+    }
 
     this.setVisible(true);
   }

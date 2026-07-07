@@ -29,7 +29,19 @@ export class UpgradeSystem {
     const upgradeData = (data.upgrades || {});
     this.rarities = upgradeData.rarities || {};
     this.upgrades = upgradeData.upgrades || [];
+    this.diminishingRate = upgradeData.diminishingRate ?? 0.25;
     this.active = []; // applied upgrades (in acquisition order)
+    this.stacks = {}; // upgrade id -> number of times taken
+  }
+
+  /** How many times an upgrade has been taken this run. */
+  getStacks(id) {
+    return this.stacks[id] || 0;
+  }
+
+  /** Max times an upgrade may be taken (Infinity if unspecified). */
+  maxStacksOf(u) {
+    return u.maxStacks != null ? u.maxStacks : Infinity;
   }
 
   /** IDs of spells the player currently owns (upgrade targets). */
@@ -37,10 +49,15 @@ export class UpgradeSystem {
     return this.magicSystem.ownedMagics.map((m) => m.id);
   }
 
-  /** Upgrades whose target spell is currently owned by the player. */
+  /**
+   * Upgrades that can still be offered: target spell is owned AND the upgrade
+   * has not yet reached its maxStacks.
+   */
   availableUpgrades() {
     const owned = new Set(this.getOwnedSpellIds());
-    return this.upgrades.filter((u) => owned.has(u.spell));
+    return this.upgrades.filter(
+      (u) => owned.has(u.spell) && this.getStacks(u.id) < this.maxStacksOf(u)
+    );
   }
 
   /** Metadata (name/weight/color) for a rarity key. */
@@ -82,7 +99,10 @@ export class UpgradeSystem {
   }
 
   /**
-   * Apply a chosen upgrade to its target spell.
+   * Apply a chosen upgrade to its target spell. The effect magnitude is run
+   * through the diminishing-returns curve (based on how many times this exact
+   * upgrade has already been taken) before being passed to the spell, which
+   * then clamps it to its hard limits.
    * @param {object} upgrade  descriptor from data/upgrades.json
    * @returns {boolean} true if applied
    */
@@ -90,12 +110,38 @@ export class UpgradeSystem {
     if (!upgrade) return false;
     const magic = this.magicSystem.getMagicById(upgrade.spell);
     if (!magic) return false;
-    const ok = magic.applyUpgrade(upgrade);
+    if (this.getStacks(upgrade.id) >= this.maxStacksOf(upgrade)) return false;
+
+    const effective = this.effectiveValue(upgrade);
+    const ok = magic.applyUpgrade(upgrade, effective);
     if (ok) {
+      this.stacks[upgrade.id] = this.getStacks(upgrade.id) + 1;
       this.active.push(upgrade);
       this.scene.game.events.emit(EVENTS.LEVEL_UP_CHOICE, upgrade, magic);
     }
     return ok;
+  }
+
+  /**
+   * Diminishing-returns-adjusted effect magnitude for the NEXT stack of an
+   * upgrade. value / (1 + rate * stacksAlreadyTaken), so each additional stack
+   * is weaker than the last (e.g. 15 -> 12 -> 10 -> 8 for damage at rate 0.25).
+   * @param {object} upgrade
+   * @returns {number}
+   */
+  effectiveValue(upgrade) {
+    const taken = this.getStacks(upgrade.id);
+    const factor = 1 / (1 + this.diminishingRate * taken);
+    return (upgrade.value || 0) * factor;
+  }
+
+  /** Upgrades applied so far, as "Name xN" strings (for HUD/debug). */
+  getActiveUpgradeSummary() {
+    const counts = {};
+    this.active.forEach((u) => {
+      counts[u.name] = (counts[u.name] || 0) + 1;
+    });
+    return Object.entries(counts).map(([name, n]) => `${name} x${n}`);
   }
 
   /** Upgrades applied so far (for HUD/debug). */
@@ -103,20 +149,24 @@ export class UpgradeSystem {
     return this.active;
   }
 
-  /** Human-readable effect summary for a card, derived from type + value. */
-  describe(upgrade) {
+  /**
+   * Human-readable effect summary for a card. `stacksTaken` lets the card show
+   * the diminished value the player will actually receive on this pick.
+   */
+  describe(upgrade, stacksTaken = 0) {
     if (!upgrade) return "";
+    const v = Math.round((upgrade.value || 0) / (1 + this.diminishingRate * stacksTaken));
     switch (upgrade.type) {
       case "damage":
-        return `Damage +${upgrade.value}%`;
+        return `Damage +${v}%`;
       case "projectileCount":
-        return `Projectiles +${upgrade.value}`;
+        return `Projectiles +${v}`;
       case "cooldown":
-        return `Cooldown -${upgrade.value}%`;
+        return `Cooldown -${v}%`;
       case "size":
-        return `Size +${upgrade.value}%`;
+        return `Size +${v}%`;
       case "burn":
-        return `Burn chance +${Math.round(upgrade.value * 100)}%`;
+        return `Burn chance +${Math.round(v * 100)}%`;
       case "explode":
         return `Explodes on impact`;
       case "return":

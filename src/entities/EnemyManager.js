@@ -54,6 +54,19 @@ export class EnemyManager {
     return this.group.countActive(true);
   }
 
+  /**
+   * Dynamic difficulty multiplier from survival time + player level. Smooth
+   * (sub-exponential) so enemies keep pace as the run goes long without ever
+   * exploding: ~1.0 at the start, scaling up gradually. Capped to avoid absurd
+   * late-game spikes.
+   */
+  getScale() {
+    const minutes = (this.scene.runTime || 0) / 60000;
+    const timeScale = 1 + Math.pow(minutes, 1.15) * 0.3;
+    const levelScale = 1 + (this.level - 1) * 0.03;
+    return Math.min(40, timeScale * levelScale);
+  }
+
   /** Advance the spawn timer; spawn when due and under the cap. */
   update(deltaMs) {
     this.elapsed += deltaMs;
@@ -76,9 +89,27 @@ export class EnemyManager {
     const pos = this.getSpawnPosition();
     const enemy = this.group.get(pos.x, pos.y);
     if (enemy) {
-      enemy.spawnAt(pos.x, pos.y, this.player, def);
+      enemy.spawnAt(pos.x, pos.y, this.player, this.scaledDef(def));
       this.scene.game.events.emit(EVENTS.ENEMY_SPAWNED, enemy);
     }
+  }
+
+  /**
+   * Return a shallow copy of an enemy definition scaled by the current
+   * difficulty multiplier. HP scales fully; damage and EXP scale more gently so
+   * the player is challenged but not one-shot.
+   * @param {object} def
+   */
+  scaledDef(def) {
+    const scale = this.getScale();
+    const half = 1 + (scale - 1) * 0.5; // damage grows at half the HP rate
+    const third = 1 + (scale - 1) * 0.3; // EXP grows at a third
+    return {
+      ...def,
+      hp: Math.round((def.hp ?? 20) * scale),
+      damage: Math.round((def.damage ?? 0) * half),
+      experienceReward: Math.round((def.experienceReward ?? 10) * third),
+    };
   }
 
   /** Compute a spawn point just outside the current camera viewport. */

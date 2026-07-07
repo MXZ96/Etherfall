@@ -219,6 +219,14 @@ export class GameScene extends Phaser.Scene {
       })),
       // Debug-only build info
       activeUpgrades: this.upgradeSystem.getActiveUpgrades().map((u) => u.name),
+      upgradeStacks: this.upgradeSystem.getActiveUpgradeSummary(),
+      enemyScale: this.enemyManager.getScale(),
+      spellMults: this.magicSystem.ownedMagics.map((m) => ({
+        name: m.name,
+        dmgMult: m.damageMult,
+        cdMult: m.cooldownMult,
+        sizeMult: m.sizeMult,
+      })),
     });
 
     // While a level-up overlay is open the world is frozen.
@@ -476,11 +484,11 @@ export class GameScene extends Phaser.Scene {
       spell: u.spell,
       element: this.magicSystem.getMagicById(u.spell)?.element || "fire",
       spellName: this.magicSystem.getMagicById(u.spell)?.name || u.spell,
-      desc: this.upgradeSystem.describe(u),
+      desc: this.upgradeSystem.describe(u, this.upgradeSystem.getStacks(u.id)),
     }));
 
     this.levelUpUI.show(level, choices, (choice) => {
-      this.upgradeSystem.applyUpgrade(choice.upgrade);
+      if (choice && choice.upgrade) this.upgradeSystem.applyUpgrade(choice.upgrade);
       this.onLevelUpContinue();
     });
   }

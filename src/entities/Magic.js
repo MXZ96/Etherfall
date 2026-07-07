@@ -50,6 +50,14 @@ export class Magic {
     this.explode = false; // detonate on impact (AoE)
     this.returning = false; // boomerang back to the caster
 
+    // --- Hard caps so builds can't scale infinitely (data/magic.json) ---
+    this.limits = def.limits || {
+      maxProjectile: 8,
+      maxDamageMultiplier: 5,
+      maxSizeMultiplier: 3,
+      maxCooldownReduction: 50,
+    };
+
     // --- Effective (live) stats, recomputed in recompute() ---
     this.damage = this.base.damage;
     this.cooldown = this.base.cooldown;
@@ -75,26 +83,41 @@ export class Magic {
 
   /**
    * Apply an upgrade descriptor to this spell (JSON-driven, no hardcoded logic).
+   * `valueOverride` lets the UpgradeSystem pass a diminishing-returns-adjusted
+   * amount; if omitted the upgrade's own `value` is used. Every numeric effect
+   * is clamped to this spell's `limits` so a build can never scale infinitely.
    * @param {object} u  { type, value }
+   * @param {number} [valueOverride]  pre-scaled effect magnitude
    * @returns {boolean} true if the upgrade changed something
    */
-  applyUpgrade(u) {
+  applyUpgrade(u, valueOverride) {
     if (!u) return false;
+    const v = valueOverride ?? u.value ?? 0;
+
     switch (u.type) {
-      case "damage":
-        this.damageMult += (u.value || 0) / 100;
+      case "damage": {
+        const next = this.damageMult + v / 100;
+        this.damageMult = Math.min(next, this.limits.maxDamageMultiplier);
         break;
-      case "projectileCount":
-        this.base.projectileCount += u.value || 0;
+      }
+      case "projectileCount": {
+        const next = this.base.projectileCount + v;
+        this.base.projectileCount = Math.min(Math.round(next), this.limits.maxProjectile);
         break;
-      case "cooldown":
-        this.cooldownMult *= 1 - (u.value || 0) / 100;
+      }
+      case "cooldown": {
+        const floor = 1 - this.limits.maxCooldownReduction / 100;
+        const next = this.cooldownMult * (1 - v / 100);
+        this.cooldownMult = Math.max(next, floor); // never hits 0 / negative
         break;
-      case "size":
-        this.sizeMult += (u.value || 0) / 100;
+      }
+      case "size": {
+        const next = this.sizeMult + v / 100;
+        this.sizeMult = Math.min(next, this.limits.maxSizeMultiplier);
         break;
+      }
       case "burn":
-        this.burnChance = Math.min(1, this.burnChance + (u.value || 0));
+        this.burnChance = Math.min(1, this.burnChance + v);
         break;
       case "explode":
         this.explode = true;

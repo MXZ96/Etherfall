@@ -1,13 +1,16 @@
 # Etherfall
 
 A browser **Bullet-Heaven Roguelite** (top-down action RPG) built with **Phaser 3**
-and **vanilla ES Modules**. This repository is **version 0.0.5** — the Elemental
-Foundation & Spell Upgrade Framework. The player AUTO-CASTS Fireball at the
+and **vanilla ES Modules**. This repository is **version 0.0.5.1** — the
+Balance & Progression Polish Patch. The player AUTO-CASTS Fireball at the
 nearest enemy; on level-up the game pauses and offers three rarity-weighted
 spell upgrades (damage, projectiles, cooldown, size, burn, explode, return)
-that permanently level up the spell and build a run. Water/Air/Earth spells are
-registered and prepared for multi-slot loadouts; Spirit stays locked. Affinity
-and fusion are still future; the architecture is ready to grow into them.
+that permanently level up the spell and build a run. Progression is now bounded
+by per-spell `limits` (max projectiles / damage / size / cooldown), per-upgrade
+`maxStacks`, and a diminishing-returns curve so builds can't scale infinitely.
+Enemies scale smoothly with survival time + player level to keep the player
+challenged. Water/Air/Earth spells are registered and prepared for multi-slot
+loadouts; Spirit stays locked. Affinity and fusion are still future.
 
 ## Running locally
 
@@ -58,7 +61,7 @@ etherfall/
     └── data/             # JSON content (player, enemy, maps, magic, elements, upgrades, ...)
 ```
 
-## How it works (v0.0.5)
+## How it works (v0.0.5.1)
 
 1. **BootScene** creates persistent managers (Save / Settings / Audio) on the
    global registry, then generates **all art procedurally** via `TextureManager`
@@ -76,17 +79,29 @@ etherfall/
    contact, both sides use the unified **DamageSystem**: the Voidling deals
    contact damage (player gets 500ms i-frames, blink, knockback, screen shake)
    and the player wears it down for EXP. Death spawns a fade effect.
-5. The **LevelSystem** tracks EXP with a scalable curve; on level-up the game
-   pauses and the **LevelUpUI** overlay shows three **rarity-weighted spell
-   upgrades** rolled by the **UpgradeSystem**. Picking a card applies it
-   immediately (raising that spell's **level** and its effective stats) and
-   resumes play. Fireball upgrades range from Common (+10% damage, +1
-   projectile) through Legendary (Phoenix Core boomerang). Multi-projectile
-   fan-spread, burn-on-hit, Inferno explosion and Phoenix return are all driven
-    by `data/upgrades.json` + the element/status-effect data.
-6. **PauseScene** (Esc/P) overlays resume / fullscreen / quit options.
-   Press **F1** for the debug overlay (entities, enemies, HP, velocity, collision,
-   owned spells + levels, active upgrades, element, projectile count).
+ 5. The **LevelSystem** tracks EXP with a scalable curve (slowed in v0.0.5.1 so
+    early levels feel deliberate); on level-up the game pauses and the
+    **LevelUpUI** overlay shows three **rarity-weighted spell upgrades** rolled
+    by the **UpgradeSystem**. Picking a card applies it immediately (raising that
+    spell's **level** and its effective stats) and resumes play. Every upgrade is
+    bounded by `maxStacks`, a **diminishing-returns** curve (`diminishingRate` in
+    `data/upgrades.json`), and the spell's `limits` in `data/magic.json`
+    (maxProjectile 8, maxDamageMultiplier 500%, maxSizeMultiplier 3x,
+    maxCooldownReduction 50%). Fireball upgrades range from Common (+15% damage,
+    +1 projectile) through Legendary (Phoenix Core boomerang, maxStacks 1).
+    Multi-projectile fan-spread, burn-on-hit, Inferno explosion and Phoenix
+    return are all driven by `data/upgrades.json` + the element/status-effect data.
+ 6. **EnemyManager** applies smooth, sub-exponential **enemy scaling** from
+    survival time + player level, so Voidlings grow tougher (HP/damage) the
+    longer the run lasts — keeping the player challenged without runaway spikes.
+ 7. **MainMenuScene** shows **START RUN** + **SETTINGS**; a **CONTINUE** button
+    appears only when a valid save exists (`SaveSystem.hasSave()`). The save
+    document already reserves `progress` (highestLevel, unlockedElements,
+    discoveredSpells, achievements) for a future full save system.
+ 8. **PauseScene** (Esc/P) overlays resume / fullscreen / quit options.
+    Press **F1** for the debug overlay (entities, enemies, HP, velocity, collision,
+    owned spells + levels, per-spell multipliers, upgrade stacks, enemy scale,
+    element, projectile count).
 
 ## Future systems (architecture is ready)
 

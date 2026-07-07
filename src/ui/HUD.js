@@ -147,9 +147,13 @@ export class HUD {
     const spells = (s.spells || [])
       .map((sp) => `  ${sp.name} Lv${sp.level} [${sp.element}] ×${sp.projectileCount}`)
       .join("\n");
-    const upgrades = (s.activeUpgrades && s.activeUpgrades.length)
-      ? s.activeUpgrades.join(", ")
+    const mults = (s.spellMults || [])
+      .map((m) => `  ${m.name}: dmg x${m.dmgMult.toFixed(2)} cd x${m.cdMult.toFixed(2)} size x${m.sizeMult.toFixed(2)}`)
+      .join("\n");
+    const upgrades = (s.upgradeStacks && s.upgradeStacks.length)
+      ? s.upgradeStacks.join(", ")
       : "none";
+    const enemyScale = s.enemyScale != null ? s.enemyScale.toFixed(2) : "1.00";
     return (
       `FPS ${s.fps}\n` +
       `ENTITY ${s.entityCount}\n` +
@@ -157,6 +161,7 @@ export class HUD {
       `PROJECTILES ${s.projectiles}\n` +
       `MAGIC ${s.magicName} (${s.magicElement})\n` +
       `MAGIC CD ${Math.ceil(s.magicCdMs)}ms\n` +
+      `ENEMY SCALE x${enemyScale}\n` +
       `DMG EVENTS ${s.damageEvents}\n` +
       `PLAYER HP ${Math.ceil(s.playerHp)} / ${s.maxHp}\n` +
       `VEL ${s.velX}, ${s.velY}\n` +
@@ -164,8 +169,9 @@ export class HUD {
       `LVL ${s.level}\n` +
       `EXP ${s.exp} / ${s.expRequired}\n` +
       `POS ${Math.round(s.playerX)}, ${Math.round(s.playerY)}\n` +
+      `SPELL MULTS\n${mults}\n` +
       `SPELLS\n${spells}\n` +
-      `UPGRADES ${upgrades}`
+      `UPGRADE STACKS ${upgrades}`
     );
   }
 

@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "magic": [
     {
       "id": "fireball",
@@ -12,7 +12,13 @@
       "size": 12,
       "lifetime": 1500,
       "projectileCount": 1,
-      "starter": true
+      "starter": true,
+      "limits": {
+        "maxProjectile": 8,
+        "maxDamageMultiplier": 5,
+        "maxSizeMultiplier": 3,
+        "maxCooldownReduction": 50
+      }
     },
     {
       "id": "water_bolt",
@@ -24,7 +30,13 @@
       "range": 650,
       "size": 10,
       "lifetime": 1500,
-      "projectileCount": 1
+      "projectileCount": 1,
+      "limits": {
+        "maxProjectile": 8,
+        "maxDamageMultiplier": 5,
+        "maxSizeMultiplier": 3,
+        "maxCooldownReduction": 50
+      }
     },
     {
       "id": "wind_blade",
@@ -36,7 +48,13 @@
       "range": 550,
       "size": 14,
       "lifetime": 1200,
-      "projectileCount": 1
+      "projectileCount": 1,
+      "limits": {
+        "maxProjectile": 8,
+        "maxDamageMultiplier": 5,
+        "maxSizeMultiplier": 3,
+        "maxCooldownReduction": 50
+      }
     },
     {
       "id": "rock_spike",
@@ -48,7 +66,13 @@
       "range": 500,
       "size": 16,
       "lifetime": 1400,
-      "projectileCount": 1
+      "projectileCount": 1,
+      "limits": {
+        "maxProjectile": 8,
+        "maxDamageMultiplier": 5,
+        "maxSizeMultiplier": 3,
+        "maxCooldownReduction": 50
+      }
     },
     {
       "id": "spirit_orb",
@@ -61,7 +85,13 @@
       "size": 14,
       "lifetime": 2000,
       "projectileCount": 1,
-      "locked": true
+      "locked": true,
+      "limits": {
+        "maxProjectile": 8,
+        "maxDamageMultiplier": 5,
+        "maxSizeMultiplier": 3,
+        "maxCooldownReduction": 50
+      }
     }
   ]
 }

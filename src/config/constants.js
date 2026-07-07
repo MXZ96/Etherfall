@@ -32,11 +32,11 @@ export const ENEMY = {
 };
 
 // Progression (EXP) curve tuning. See utils/leveling.js for the formula.
-// The curve reproduces the v0.0.2 spec example:
-//   L1->L2 : 100   L2->L3 : 150   L3->L4 : 200  (cumulative: 0/100/250/450)
+// Tuned in v0.0.5.1 to make early levels feel slower so the player is never
+// an instant god-mode: L1->L2 : 130  L2->L3 : 200  L3->L4 : 270 ...
 export const EXP = {
-  BASE: 100,
-  STEP: 50,
+  BASE: 130,
+  STEP: 70,
 };
 
 // Combat tuning (v0.0.3). Knockback is an impulse (px/s) reduced by an

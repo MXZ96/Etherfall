@@ -1,5 +1,6 @@
 {
-  "version": 1,
+  "version": 2,
+  "diminishingRate": 0.25,
   "rarities": {
     "common": {
       "name": "Common",
@@ -39,7 +40,8 @@
       "rarity": "common",
       "spell": "fireball",
       "type": "damage",
-      "value": 10
+      "value": 15,
+      "maxStacks": 10
     },
     {
       "id": "fireball_extra_projectile",
@@ -47,7 +49,8 @@
       "rarity": "common",
       "spell": "fireball",
       "type": "projectileCount",
-      "value": 1
+      "value": 1,
+      "maxStacks": 3
     },
     {
       "id": "fireball_fast_flame",
@@ -55,7 +58,8 @@
       "rarity": "uncommon",
       "spell": "fireball",
       "type": "cooldown",
-      "value": 10
+      "value": 10,
+      "maxStacks": 3
     },
     {
       "id": "fireball_burn_chance",
@@ -63,7 +67,8 @@
       "rarity": "uncommon",
       "spell": "fireball",
       "type": "burn",
-      "value": 0.25
+      "value": 0.25,
+      "maxStacks": 2
     },
     {
       "id": "fireball_triple_flame",
@@ -71,7 +76,8 @@
       "rarity": "rare",
       "spell": "fireball",
       "type": "projectileCount",
-      "value": 2
+      "value": 2,
+      "maxStacks": 1
     },
     {
       "id": "fireball_large_flame",
@@ -79,7 +85,8 @@
       "rarity": "rare",
       "spell": "fireball",
       "type": "size",
-      "value": 50
+      "value": 50,
+      "maxStacks": 2
     },
     {
       "id": "fireball_inferno_shot",
@@ -87,7 +94,8 @@
       "rarity": "epic",
       "spell": "fireball",
       "type": "explode",
-      "value": 1
+      "value": 1,
+      "maxStacks": 1
     },
     {
       "id": "fireball_phoenix_core",
@@ -95,7 +103,8 @@
       "rarity": "legendary",
       "spell": "fireball",
       "type": "return",
-      "value": 1
+      "value": 1,
+      "maxStacks": 1
     }
   ]
 }
