@@ -43,6 +43,16 @@ export class Projectile extends LivingEntity {
     this.lifetime = magic.lifetime ?? 1500;
     this.color = color;
 
+    // --- Upgrade-driven behaviours (set on the spell) ---
+    this.explode = !!magic.explode; // detonate on impact (AoE)
+    this.returning = !!magic.returning; // boomerang back to caster
+    this.burnChance = magic.burnChance || 0; // chance to apply burn on hit
+    this.bouncesRemaining = this.returning ? 1 : 0; // remaining return trips
+    this.startBounces = this.bouncesRemaining;
+    this.recentHits = new Set(); // enemies already struck this flight
+    this.homeX = this.x;
+    this.homeY = this.y;
+
     this.traveled = 0;
     this.age = 0;
     this.trailTimer = 0;
@@ -55,6 +65,29 @@ export class Projectile extends LivingEntity {
     this.setTint(color);
     this.setBlendMode(Phaser.BlendModes.ADD); // glow
     this.setActive(true).setVisible(true);
+  }
+
+  /**
+   * Reverse the projectile back toward the caster (Phoenix Core). Returns true
+   * if a return trip is still available.
+   */
+  returnToCaster() {
+    if (this.bouncesRemaining <= 0) return false;
+    this.bouncesRemaining -= 1;
+    const angle = Math.atan2(this.homeY - this.y, this.homeX - this.x);
+    this.body.setVelocity(Math.cos(angle) * this.speed, Math.sin(angle) * this.speed);
+    this.setRotation(angle);
+    return true;
+  }
+
+  /** Mark an enemy as already hit so a returning shot won't strike it twice. */
+  hasHit(enemy) {
+    return this.recentHits.has(enemy);
+  }
+
+  /** Record an enemy as struck this flight. */
+  markHit(enemy) {
+    this.recentHits.add(enemy);
   }
 
   /** Return to the pool for reuse. */
@@ -81,6 +114,14 @@ export class Projectile extends LivingEntity {
 
     if (this.traveled >= this.range || this.age >= this.lifetime) {
       this.despawn();
+      return;
+    }
+
+    // A returning (Phoenix Core) shot despawns once it gets back to the caster.
+    if (this.returning && this.startBounces > 0 && this.bouncesRemaining < this.startBounces) {
+      const dx = this.homeX - this.x;
+      const dy = this.homeY - this.y;
+      if (dx * dx + dy * dy < 50 * 50) this.despawn();
     }
   }
 

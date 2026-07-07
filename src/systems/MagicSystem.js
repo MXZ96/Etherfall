@@ -31,9 +31,24 @@ export class MagicSystem {
 
     const magicData = (scene.registry.get("data") || {}).magic?.magic || [];
     this.magics = magicData.map((d) => new Magic(d));
+
+    // A spell is "owned" (slottable) if it is a starter or explicitly flagged,
+    // and its element is not locked (e.g. spirit). This is the foundation for
+    // future multi-slot loadouts: as the player unlocks spells, they join
+    // `ownedMagics` and become eligible for upgrades / slot selection.
+    this.magics.forEach((m) => {
+      if ((m.def.starter || m.id === "fireball") && !m.locked) m.owned = true;
+    });
+    this.ownedMagics = this.magics.filter((m) => m.owned);
+
     this.activeIndex = 0;
-    this.active = this.magics[0] || null;
+    this.active = this.ownedMagics[0] || this.magics[0] || null;
     this.timer = 0; // counts up to the active cooldown
+  }
+
+  /** Find a registered spell by id. */
+  getMagicById(id) {
+    return this.magics.find((m) => m.id === id) || null;
   }
 
   /** Name of the equipped spell (for the HUD). */
@@ -77,14 +92,15 @@ export class MagicSystem {
     if (!target) return; // no enemy -> do not cast
 
     const color = this.elementColors[this.active.element] ?? 0xffffff;
-    this.active.createProjectile(
+    this.active.createProjectiles(
       this.scene,
       this.projectiles,
       this.player.x,
       this.player.y,
       target.x,
       target.y,
-      color
+      color,
+      this.player
     );
     this.scene.game.events.emit(EVENTS.MAGIC_CASTED, this.active);
   }

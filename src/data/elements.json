@@ -3,28 +3,38 @@
   "elements": {
     "fire": {
       "name": "Fire",
-      "description": "High damage elemental force",
-      "color": "#ff5a2c"
+      "description": "A destructive elemental force focused on damage and burning",
+      "color": "#ff5a2c",
+      "statusEffects": ["burn"],
+      "locked": false
     },
     "water": {
       "name": "Water",
-      "description": "Chilling control",
-      "color": "#3aa0ff"
+      "description": "A chilling elemental force focused on control and slowing",
+      "color": "#3aa0ff",
+      "statusEffects": ["chill"],
+      "locked": false
     },
     "air": {
       "name": "Air",
-      "description": "Swift and piercing",
-      "color": "#9fe8ff"
+      "description": "A swift elemental force focused on piercing and knockback",
+      "color": "#9fe8ff",
+      "statusEffects": ["knockback"],
+      "locked": false
     },
     "earth": {
       "name": "Earth",
-      "description": "Heavy and grounding",
-      "color": "#9c7a4d"
+      "description": "A heavy elemental force focused on impact and grounding",
+      "color": "#9c7a4d",
+      "statusEffects": [],
+      "locked": false
     },
     "spirit": {
       "name": "Spirit",
-      "description": "Ethereal arcane energy",
-      "color": "#b06bff"
+      "description": "An ethereal arcane force, sealed away and not yet available",
+      "color": "#b06bff",
+      "statusEffects": [],
+      "locked": true
     }
   }
 }

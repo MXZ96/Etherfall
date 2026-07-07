@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "rarities": {
+    "common": {
+      "name": "Common",
+      "weight": 60,
+      "color": "#b8bcc8",
+      "description": "Small improvements"
+    },
+    "uncommon": {
+      "name": "Uncommon",
+      "weight": 25,
+      "color": "#4aa3ff",
+      "description": "Noticeable improvements"
+    },
+    "rare": {
+      "name": "Rare",
+      "weight": 10,
+      "color": "#b06bff",
+      "description": "Strong upgrades"
+    },
+    "epic": {
+      "name": "Epic",
+      "weight": 4,
+      "color": "#ff7ad9",
+      "description": "Gameplay changing upgrades"
+    },
+    "legendary": {
+      "name": "Legendary",
+      "weight": 1,
+      "color": "#ffb347",
+      "description": "Transformative upgrades"
+    }
+  },
+  "upgrades": [
+    {
+      "id": "fireball_damage_increase",
+      "name": "Damage Increase",
+      "rarity": "common",
+      "spell": "fireball",
+      "type": "damage",
+      "value": 10
+    },
+    {
+      "id": "fireball_extra_projectile",
+      "name": "Additional Flame",
+      "rarity": "common",
+      "spell": "fireball",
+      "type": "projectileCount",
+      "value": 1
+    },
+    {
+      "id": "fireball_fast_flame",
+      "name": "Fast Flame",
+      "rarity": "uncommon",
+      "spell": "fireball",
+      "type": "cooldown",
+      "value": 10
+    },
+    {
+      "id": "fireball_burn_chance",
+      "name": "Burn Chance",
+      "rarity": "uncommon",
+      "spell": "fireball",
+      "type": "burn",
+      "value": 0.25
+    },
+    {
+      "id": "fireball_triple_flame",
+      "name": "Triple Flame",
+      "rarity": "rare",
+      "spell": "fireball",
+      "type": "projectileCount",
+      "value": 2
+    },
+    {
+      "id": "fireball_large_flame",
+      "name": "Large Flame",
+      "rarity": "rare",
+      "spell": "fireball",
+      "type": "size",
+      "value": 50
+    },
+    {
+      "id": "fireball_inferno_shot",
+      "name": "Inferno Shot",
+      "rarity": "epic",
+      "spell": "fireball",
+      "type": "explode",
+      "value": 1
+    },
+    {
+      "id": "fireball_phoenix_core",
+      "name": "Phoenix Core",
+      "rarity": "legendary",
+      "spell": "fireball",
+      "type": "return",
+      "value": 1
+    }
+  ]
+}

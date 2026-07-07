@@ -1,11 +1,13 @@
 # Etherfall
 
 A browser **Bullet-Heaven Roguelite** (top-down action RPG) built with **Phaser 3**
-and **vanilla ES Modules**. This repository is **version 0.0.4** — the Arcane
-Combat System. The player now AUTO-CASTS magic (Fireball) at the nearest enemy;
-projectiles deal elemental damage with glow/trail/hit effects, and floating
-damage numbers appear on hits. Water/Air/Earth/Spirit spells, affinity and
-fusion are still future; just a clean, scalable architecture to grow into.
+and **vanilla ES Modules**. This repository is **version 0.0.5** — the Elemental
+Foundation & Spell Upgrade Framework. The player AUTO-CASTS Fireball at the
+nearest enemy; on level-up the game pauses and offers three rarity-weighted
+spell upgrades (damage, projectiles, cooldown, size, burn, explode, return)
+that permanently level up the spell and build a run. Water/Air/Earth spells are
+registered and prepared for multi-slot loadouts; Spirit stays locked. Affinity
+and fusion are still future; the architecture is ready to grow into them.
 
 ## Running locally
 
@@ -49,14 +51,14 @@ etherfall/
     ├── config/           # constants.js, GameConfig.js
     ├── scenes/           # Boot, Preload, MainMenu, Game, Pause, GameOver
     ├── entities/         # LivingEntity, Player, Enemy, Projectile, Magic, EnemyManager
-    ├── systems/          # Save, Settings, Level, Damage, Magic
+    ├── systems/          # Save, Settings, Level, Damage, Magic, Upgrade
     ├── managers/         # Input, Audio, Texture
     ├── ui/               # HUD, LevelUpUI
     ├── utils/            # math, events, leveling
-    └── data/             # JSON content (player, enemy, maps, magic, ...)
+    └── data/             # JSON content (player, enemy, maps, magic, elements, upgrades, ...)
 ```
 
-## How it works (v0.0.4)
+## How it works (v0.0.5)
 
 1. **BootScene** creates persistent managers (Save / Settings / Audio) on the
    global registry, then generates **all art procedurally** via `TextureManager`
@@ -75,19 +77,29 @@ etherfall/
    contact damage (player gets 500ms i-frames, blink, knockback, screen shake)
    and the player wears it down for EXP. Death spawns a fade effect.
 5. The **LevelSystem** tracks EXP with a scalable curve; on level-up the game
-   pauses and the **LevelUpUI** overlay shows three placeholder cards.
+   pauses and the **LevelUpUI** overlay shows three **rarity-weighted spell
+   upgrades** rolled by the **UpgradeSystem**. Picking a card applies it
+   immediately (raising that spell's **level** and its effective stats) and
+   resumes play. Fireball upgrades range from Common (+10% damage, +1
+   projectile) through Legendary (Phoenix Core boomerang). Multi-projectile
+   fan-spread, burn-on-hit, Inferno explosion and Phoenix return are all driven
+    by `data/upgrades.json` + the element/status-effect data.
 6. **PauseScene** (Esc/P) overlays resume / fullscreen / quit options.
-   Press **F1** for the debug overlay (entities, enemies, HP, velocity, collision).
+   Press **F1** for the debug overlay (entities, enemies, HP, velocity, collision,
+   owned spells + levels, active upgrades, element, projectile count).
 
 ## Future systems (architecture is ready)
 
 The data files and folder layout already anticipate:
 
-- **Magic / Fusion** — `data/magic.json`, `data/fusion.json`
+- **Elements / Status** — `data/elements.json`, `data/status_effect.json` (Spirit locked)
+- **Upgrades / Rarity** — `data/upgrades.json` (Common→Legendary weights + colours)
+- **Magic / Fusion** — `data/magic.json`, `data/fusion.json` (multi-slot ready)
+- **Affinity** — `data/affinity.json` (reserved for per-element scaling)
 - **Enemies / Bosses** — `data/enemy.json`, `data/boss.json` (Enemy is data-driven ready)
 - **Artifacts / Achievements** — `data/artifact.json`, `data/achievement.json`
 - **Weather / Events** — `data/weather.json`, `data/event.json`
-- **Affinity**, **Multiplayer** — manager/registry seams are in place
+- **Spell Evolution / All-Rounder**, **Multiplayer** — manager/registry seams are in place
 - **Audio** — `AudioManager` buses (master/music/sfx) wired to settings
 
 Saving (localStorage) is versioned and sectioned so new systems can extend the

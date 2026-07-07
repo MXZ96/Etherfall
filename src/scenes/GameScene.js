@@ -33,6 +33,7 @@ import { InputManager } from "../managers/InputManager.js";
 import { LevelSystem } from "../systems/LevelSystem.js";
 import { DamageSystem } from "../systems/DamageSystem.js";
 import { MagicSystem } from "../systems/MagicSystem.js";
+import { UpgradeSystem } from "../systems/UpgradeSystem.js";
 import { HUD } from "../ui/HUD.js";
 import { LevelUpUI } from "../ui/LevelUpUI.js";
 
@@ -65,6 +66,13 @@ export class GameScene extends Phaser.Scene {
       const c = Phaser.Display.Color.HexStringToColor(elementData[key].color);
       this.elementColors[key] = c.color;
     }
+
+    // Status-effect lookup (id -> definition) from data/status_effect.json.
+    // Used by the burn-on-hit upgrade (Fireball's "Burn Chance").
+    this.statusEffects = {};
+    (data.status_effect?.statusEffects || []).forEach((s) => {
+      this.statusEffects[s.id] = s;
+    });
 
     // --- World (large bounded arena) ---
     const worldW = mapDef.width || WORLD.WIDTH;
@@ -143,6 +151,9 @@ export class GameScene extends Phaser.Scene {
       this
     );
 
+    // --- Spell progression (level-up upgrades) ---
+    this.upgradeSystem = new UpgradeSystem(this, data, this.magicSystem);
+
     // --- UI ---
     this.hud = new HUD(this);
     this.levelUpUI = new LevelUpUI(this);
@@ -195,6 +206,19 @@ export class GameScene extends Phaser.Scene {
       projectiles: this.projectiles.countActive(true),
       damageEvents: this.damageEvents,
       debug: this.debug,
+      // Owned spells (multi-slot ready) for the HUD spell list
+      spells: this.magicSystem.ownedMagics.map((m) => ({
+        id: m.id,
+        name: m.name,
+        element: m.element,
+        level: m.level,
+        projectileCount: m.projectileCount,
+        active: m === this.magicSystem.active,
+        ready: m === this.magicSystem.active ? this.magicSystem.isReady : true,
+        cdMs: m === this.magicSystem.active ? this.magicSystem.cooldownRemaining : 0,
+      })),
+      // Debug-only build info
+      activeUpgrades: this.upgradeSystem.getActiveUpgrades().map((u) => u.name),
     });
 
     // While a level-up overlay is open the world is frozen.
@@ -218,8 +242,24 @@ export class GameScene extends Phaser.Scene {
     // Enemy spawning + movement.
     this.enemyManager.update(delta);
     const children = this.enemies.getChildren();
+    const now = this.time.now;
     for (let i = 0; i < children.length; i++) {
-      if (children[i].active) children[i].tick();
+      const e = children[i];
+      if (!e.active) continue;
+      e.tick();
+      // Burn status (Damage-over-Time) ticking.
+      if (e.burn && now < e.burn.until) {
+        if (now >= e.burn.nextTick) {
+          e.burn.nextTick = now + 500;
+          this.damageSystem.applyDamage(e, e.burn.tickDamage, {
+            type: "status",
+            element: e.burn.element,
+            source: null,
+          });
+        }
+      } else if (e.burn) {
+        e.burn = null;
+      }
     }
 
     // Auto-attack magic + projectile movement.
@@ -269,10 +309,14 @@ export class GameScene extends Phaser.Scene {
 
   /**
    * Projectile hit an enemy: apply elemental damage via the unified
-   * DamageSystem, spawn a hit effect, then return the projectile to the pool.
+   * DamageSystem, then resolve any upgrade behaviours (burn / explode /
+   * return) before returning the projectile to the pool.
    */
   onProjectileHitEnemy(projectile, enemy) {
     if (!projectile.active || !enemy.active) return;
+    if (projectile.hasHit(enemy)) return; // returning shots strike each enemy once
+    projectile.markHit(enemy);
+
     const color = this.elementColors[projectile.element] ?? 0xffffff;
     this.damageSystem.applyDamage(enemy, projectile.damage, {
       type: "element",
@@ -280,7 +324,71 @@ export class GameScene extends Phaser.Scene {
       source: projectile,
     });
     this.spawnHitEffect(enemy.x, enemy.y, color);
+
+    // Burn Chance upgrade: chance to apply a burn damage-over-time.
+    if (projectile.burnChance > 0 && Math.random() < projectile.burnChance) {
+      this.applyBurn(enemy, projectile.element);
+    }
+
+    // Inferno Shot upgrade: detonate, damaging everything nearby.
+    if (projectile.explode) {
+      this.explodeAt(enemy.x, enemy.y, projectile);
+      projectile.despawn();
+      return;
+    }
+
+    // Phoenix Core upgrade: boomerang back to the caster (one return trip).
+    if (projectile.returning) {
+      if (projectile.returnToCaster()) {
+        return; // still flying (on the way back)
+      }
+      projectile.despawn();
+      return;
+    }
+
     projectile.despawn();
+  }
+
+  /** Apply a burn status effect to an enemy (driven by data/status_effect.json). */
+  applyBurn(enemy, element) {
+    const def = this.statusEffects.burn;
+    if (!def || !enemy.active) return;
+    enemy.burn = {
+      until: this.time.now + (def.duration || 3000),
+      nextTick: this.time.now + 500,
+      tickDamage: def.tickDamage || 2,
+      element,
+    };
+  }
+
+  /** AoE detonation for the Inferno Shot upgrade. */
+  explodeAt(x, y, projectile) {
+    const radius = 90;
+    const color = this.elementColors[projectile.element] ?? 0xffffff;
+    const splash = Math.round(projectile.damage * 0.6);
+    const children = this.enemies.getChildren();
+    for (let i = 0; i < children.length; i++) {
+      const e = children[i];
+      if (!e.active || e === projectile) continue;
+      const dx = e.x - x;
+      const dy = e.y - y;
+      if (dx * dx + dy * dy <= radius * radius) {
+        this.damageSystem.applyDamage(e, splash, {
+          type: "element",
+          element: projectile.element,
+          source: projectile,
+        });
+      }
+    }
+    const burst = this.add.circle(x, y, radius, color, 0.5)
+      .setDepth(6).setBlendMode(Phaser.BlendModes.ADD);
+    this.tweens.add({
+      targets: burst,
+      scale: 1.4,
+      alpha: 0,
+      duration: 260,
+      onComplete: () => burst.destroy(),
+    });
   }
 
   /** Damage feedback: count events + float a coloured "-N" number. */
@@ -356,7 +464,25 @@ export class GameScene extends Phaser.Scene {
     this.leveling = true;
     this.physics.world.pause(); // freeze all bodies
     this.save.patchSection("player", { level });
-    this.levelUpUI.show(level, () => this.onLevelUpContinue());
+
+    // Roll rarity-weighted upgrade choices and show them. Selecting one applies
+    // it immediately (raising that spell's level) and resumes the run.
+    const choices = this.upgradeSystem.rollChoices(3).map((u) => ({
+      upgrade: u,
+      name: u.name,
+      rarity: u.rarity,
+      rarityName: this.upgradeSystem.rarityMeta(u.rarity).name,
+      rarityColor: this.upgradeSystem.rarityMeta(u.rarity).color,
+      spell: u.spell,
+      element: this.magicSystem.getMagicById(u.spell)?.element || "fire",
+      spellName: this.magicSystem.getMagicById(u.spell)?.name || u.spell,
+      desc: this.upgradeSystem.describe(u),
+    }));
+
+    this.levelUpUI.show(level, choices, (choice) => {
+      this.upgradeSystem.applyUpgrade(choice.upgrade);
+      this.onLevelUpContinue();
+    });
   }
 
   onLevelUpContinue() {

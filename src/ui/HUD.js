@@ -2,9 +2,10 @@
    Etherfall - HUD (Heads-Up Display)
    Minimal, dark-fantasy overlay fixed to the camera.
 
-     Top-left  : HP bar, EXP bar, Level
-     Top-right : Run timer, Enemy count
-     Debug (F1): FPS, player position, level, EXP, enemy count
+      Top-left  : HP bar, EXP bar, Level
+      Top-right : Run timer, Enemy count
+      Top-center: owned spells (name, level, projectile count, cooldown)
+      Debug (F1): FPS, player position, level, EXP, enemy count, spell build
 
    Reads values pushed in via update(); holds no game logic. Layout uses the
    base 1280x720 resolution so it scales with the FIT scale manager.
@@ -56,12 +57,15 @@ export class HUD {
     this.enemyText = scene.add.text(rx, 32, "", right)
       .setOrigin(1, 0).setScrollFactor(0).setDepth(1001);
 
-    // Top-center: current magic + cooldown (prepared for multiple slots)
+    // Top-center: owned spells list (multi-slot ready).
     const cx = GAME.WIDTH / 2;
-    this.magicText = scene.add.text(cx, 6, "", { ...base, fontSize: "16px", color: "#ffd9a0" })
-      .setOrigin(0.5, 0).setScrollFactor(0).setDepth(1001);
-    this.magicCdText = scene.add.text(cx, 28, "", { ...base, fontSize: "12px", color: "#8a8f9c" })
-      .setOrigin(0.5, 0).setScrollFactor(0).setDepth(1001);
+    this.spellsText = scene.add.text(cx, 6, "", {
+      ...base,
+      fontSize: "15px",
+      color: "#ffd9a0",
+      align: "center",
+      lineSpacing: 4,
+    }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(1001);
 
     // Debug block (hidden until F1 toggles debug mode)
     this.debugText = scene.add.text(MARGIN, 100, "", {
@@ -76,7 +80,9 @@ export class HUD {
    * Push current values to the HUD.
    * @param {object} s {
    *   hp, maxHp, level, exp, expRequired, expProgress(0..1),
-   *   fps, timeMs, enemyCount, playerX, playerY, debug
+   *   fps, timeMs, enemyCount, playerX, playerY, debug,
+   *   spells: [{name, element, level, projectileCount, active, ready, cdMs}],
+   *   activeUpgrades: string[]
    * }
    */
   update(s) {
@@ -110,30 +116,57 @@ export class HUD {
     this.timerText.setText(`TIME ${this.formatTime(s.timeMs)}`);
     this.enemyText.setText(`ENEMIES ${s.enemyCount}`);
 
-    // --- Top-center: magic ---
-    const emoji = ELEMENT_EMOJI[s.magicElement] || "✨";
-    this.magicText.setText(`${emoji} ${s.magicName}`);
-    this.magicCdText.setText(s.magicReady ? "Ready" : `Cooldown ${(s.magicCdMs / 1000).toFixed(1)}s`);
+    // --- Top-center: owned spells ---
+    this.spellsText.setText(this.formatSpells(s.spells));
 
     // --- Debug block (F1) ---
     this.debugText.setVisible(!!s.debug);
     if (s.debug) {
-      this.debugText.setText(
-        `FPS ${s.fps}\n` +
-        `ENTITY ${s.entityCount}\n` +
-        `ENEMIES ${s.enemyCount}\n` +
-        `PROJECTILES ${s.projectiles}\n` +
-        `MAGIC ${s.magicName} (${s.magicElement})\n` +
-        `MAGIC CD ${Math.ceil(s.magicCdMs)}ms\n` +
-        `DMG EVENTS ${s.damageEvents}\n` +
-        `PLAYER HP ${Math.ceil(s.playerHp)} / ${s.maxHp}\n` +
-        `VEL ${s.velX}, ${s.velY}\n` +
-        `COLLISION ${s.colliding ? "INVULN" : "clear"}\n` +
-        `LVL ${s.level}\n` +
-        `EXP ${s.exp} / ${s.expRequired}\n` +
-        `POS ${Math.round(s.playerX)}, ${Math.round(s.playerY)}`
-      );
+      this.debugText.setText(this.formatDebug(s));
     }
+  }
+
+  /** Render the owned-spell list (name, level, projectile count, cooldown). */
+  formatSpells(spells) {
+    if (!spells || spells.length === 0) return "—";
+    return spells
+      .map((sp) => {
+        const emoji = ELEMENT_EMOJI[sp.element] || "✨";
+        const cd = sp.active
+          ? sp.ready
+            ? "Ready"
+            : `CD ${(sp.cdMs / 1000).toFixed(1)}s`
+          : "";
+        return `${emoji} ${sp.name} Lv${sp.level}  ×${sp.projectileCount}${cd ? `  (${cd})` : ""}`;
+      })
+      .join("\n");
+  }
+
+  /** Render the F1 debug block including the current spell build. */
+  formatDebug(s) {
+    const spells = (s.spells || [])
+      .map((sp) => `  ${sp.name} Lv${sp.level} [${sp.element}] ×${sp.projectileCount}`)
+      .join("\n");
+    const upgrades = (s.activeUpgrades && s.activeUpgrades.length)
+      ? s.activeUpgrades.join(", ")
+      : "none";
+    return (
+      `FPS ${s.fps}\n` +
+      `ENTITY ${s.entityCount}\n` +
+      `ENEMIES ${s.enemyCount}\n` +
+      `PROJECTILES ${s.projectiles}\n` +
+      `MAGIC ${s.magicName} (${s.magicElement})\n` +
+      `MAGIC CD ${Math.ceil(s.magicCdMs)}ms\n` +
+      `DMG EVENTS ${s.damageEvents}\n` +
+      `PLAYER HP ${Math.ceil(s.playerHp)} / ${s.maxHp}\n` +
+      `VEL ${s.velX}, ${s.velY}\n` +
+      `COLLISION ${s.colliding ? "INVULN" : "clear"}\n` +
+      `LVL ${s.level}\n` +
+      `EXP ${s.exp} / ${s.expRequired}\n` +
+      `POS ${Math.round(s.playerX)}, ${Math.round(s.playerY)}\n` +
+      `SPELLS\n${spells}\n` +
+      `UPGRADES ${upgrades}`
+    );
   }
 
   /** Format milliseconds as mm:ss. */
