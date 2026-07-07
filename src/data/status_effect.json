@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "statusEffects": [
+    {
+      "id": "burn",
+      "name": "Burn",
+      "element": "fire",
+      "description": "Takes damage over time",
+      "tickDamage": 2,
+      "duration": 3000
+    },
+    {
+      "id": "chill",
+      "name": "Chill",
+      "element": "water",
+      "description": "Slows movement",
+      "slow": 0.4,
+      "duration": 2000
+    },
+    {
+      "id": "knockback",
+      "name": "Knockback",
+      "element": "air",
+      "description": "Pushes the target away",
+      "duration": 500
+    }
+  ]
+}

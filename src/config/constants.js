@@ -78,4 +78,8 @@ export const TEXTURE_KEYS = {
   PLAYER: "player",
   ENEMY: "enemy",
   GRASS: "grass-tile",
+  PROJECTILE: "projectile",
 };
+
+// Projectile pool cap (v0.0.4). Pooled to avoid per-frame allocation.
+export const PROJECTILE_POOL = 200;

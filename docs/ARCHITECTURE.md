@@ -80,3 +80,27 @@ saves keep loading.
   stacking. Player↔enemy uses an overlap (player is never physically blocked).
 - Death flows through `onDeath()` hooks + the `combat:entity-died` event, which
   awards EXP and spawns a lightweight fade effect — keeping pooling clean.
+
+## Arcane combat (v0.0.4)
+
+- `entities/Magic.js` is a data-driven wrapper over one `data/magic.json` entry.
+  Adding a spell = adding JSON (no code). `entities/Projectile.js` is the pooled
+  shot (extends `LivingEntity`): glow tint, trail puffs, range/lifetime expiry.
+- `systems/MagicSystem.js` drives **auto-attack**: every spell cooldown it finds
+  the nearest active enemy and launches a `Projectile` via the active `Magic`. If
+  no enemy exists it does NOT cast. `setActive(index)` swaps the equipped spell
+  (v0.0.4 equips Fireball; future UI exposes multiple slots).
+- Projectile↔enemy is a pooled-group **overlap**; on hit the unified
+  `DamageSystem` applies elemental damage (`type:"element"`, `element:"fire"`),
+  a hit burst spawns, and the projectile returns to the pool.
+- `data/elements.json` maps element → colour/description (used for tints);
+  `data/status_effect.json` is structural-only for now. `DamageSystem.applyDamage`
+  now also accepts a descriptor object `{ amount, type, element, ... }`.
+- Floating **damage numbers** are spawned from the `combat:damage-dealt` event
+  (works for any target), coloured by element.
+
+## Performance notes
+
+- Both enemies and projectiles use **pooled physics groups** (no per-frame
+  allocation of entities). Trail puffs / damage numbers are short-lived tweens
+  that self-destroy. Separation uses a broadphase collider, not an O(n²) loop.

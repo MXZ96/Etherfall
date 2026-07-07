@@ -16,6 +16,15 @@ import { clamp } from "../utils/math.js";
 const MARGIN = 16;
 const BAR_W = 240;
 
+// Element -> emoji for the magic HUD badge.
+const ELEMENT_EMOJI = {
+  fire: "🔥",
+  water: "💧",
+  air: "🌬",
+  earth: "⛰",
+  spirit: "✨",
+};
+
 export class HUD {
   /**
    * @param {Phaser.Scene} scene
@@ -46,6 +55,13 @@ export class HUD {
       .setOrigin(1, 0).setScrollFactor(0).setDepth(1001);
     this.enemyText = scene.add.text(rx, 32, "", right)
       .setOrigin(1, 0).setScrollFactor(0).setDepth(1001);
+
+    // Top-center: current magic + cooldown (prepared for multiple slots)
+    const cx = GAME.WIDTH / 2;
+    this.magicText = scene.add.text(cx, 6, "", { ...base, fontSize: "16px", color: "#ffd9a0" })
+      .setOrigin(0.5, 0).setScrollFactor(0).setDepth(1001);
+    this.magicCdText = scene.add.text(cx, 28, "", { ...base, fontSize: "12px", color: "#8a8f9c" })
+      .setOrigin(0.5, 0).setScrollFactor(0).setDepth(1001);
 
     // Debug block (hidden until F1 toggles debug mode)
     this.debugText = scene.add.text(MARGIN, 100, "", {
@@ -94,13 +110,22 @@ export class HUD {
     this.timerText.setText(`TIME ${this.formatTime(s.timeMs)}`);
     this.enemyText.setText(`ENEMIES ${s.enemyCount}`);
 
+    // --- Top-center: magic ---
+    const emoji = ELEMENT_EMOJI[s.magicElement] || "✨";
+    this.magicText.setText(`${emoji} ${s.magicName}`);
+    this.magicCdText.setText(s.magicReady ? "Ready" : `Cooldown ${(s.magicCdMs / 1000).toFixed(1)}s`);
+
     // --- Debug block (F1) ---
     this.debugText.setVisible(!!s.debug);
     if (s.debug) {
       this.debugText.setText(
         `FPS ${s.fps}\n` +
-        `ENTITIES ${s.entityCount}\n` +
+        `ENTITY ${s.entityCount}\n` +
         `ENEMIES ${s.enemyCount}\n` +
+        `PROJECTILES ${s.projectiles}\n` +
+        `MAGIC ${s.magicName} (${s.magicElement})\n` +
+        `MAGIC CD ${Math.ceil(s.magicCdMs)}ms\n` +
+        `DMG EVENTS ${s.damageEvents}\n` +
         `PLAYER HP ${Math.ceil(s.playerHp)} / ${s.maxHp}\n` +
         `VEL ${s.velX}, ${s.velY}\n` +
         `COLLISION ${s.colliding ? "INVULN" : "clear"}\n` +

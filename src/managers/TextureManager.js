@@ -25,6 +25,7 @@ export class TextureManager {
     this.createPlayerTexture();
     this.createEnemyTexture();
     this.createGrassTexture();
+    this.createProjectileTexture();
   }
 
   /** Safely create a canvas texture, returning the CanvasTexture or null. */
@@ -165,6 +166,29 @@ export class TextureManager {
       else ctx.fillStyle = "#243a2a";
       ctx.fillRect(x, y, 2, 2);
     }
+
+    canvas.refresh();
+  }
+
+  // ------------------------------------------------------------------------
+  // PROJECTILE: a soft white glow orb, tinted per element at runtime.
+  // ------------------------------------------------------------------------
+  createProjectileTexture() {
+    const size = 28;
+    const canvas = this.createCanvas(TEXTURE_KEYS.PROJECTILE, size, size);
+    if (!canvas) return;
+    const ctx = canvas.getContext();
+    const c = size / 2;
+
+    // Radial gradient = glow.
+    const grad = ctx.createRadialGradient(c, c, 1, c, c, c);
+    grad.addColorStop(0, "rgba(255,255,255,1)");
+    grad.addColorStop(0.5, "rgba(255,255,255,0.85)");
+    grad.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(c, c, c, 0, Math.PI * 2);
+    ctx.fill();
 
     canvas.refresh();
   }

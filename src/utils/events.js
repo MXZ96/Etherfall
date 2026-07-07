@@ -24,6 +24,9 @@ export const EVENTS = {
   ENTITY_DIED: "combat:entity-died",
   PLAYER_DAMAGED: "player:damaged",
 
+  // Magic
+  MAGIC_CASTED: "magic:casted",
+
   // UI / Flow
   GAME_PAUSED: "flow:paused",
   GAME_RESUMED: "flow:resumed",

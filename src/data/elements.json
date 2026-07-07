@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "elements": {
+    "fire": {
+      "name": "Fire",
+      "description": "High damage elemental force",
+      "color": "#ff5a2c"
+    },
+    "water": {
+      "name": "Water",
+      "description": "Chilling control",
+      "color": "#3aa0ff"
+    },
+    "air": {
+      "name": "Air",
+      "description": "Swift and piercing",
+      "color": "#9fe8ff"
+    },
+    "earth": {
+      "name": "Earth",
+      "description": "Heavy and grounding",
+      "color": "#9c7a4d"
+    },
+    "spirit": {
+      "name": "Spirit",
+      "description": "Ethereal arcane energy",
+      "color": "#b06bff"
+    }
+  }
+}

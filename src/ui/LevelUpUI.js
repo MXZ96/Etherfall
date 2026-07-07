@@ -14,6 +14,15 @@ const CARD_W = 240;
 const CARD_H = 300;
 const CARD_GAP = 40;
 
+// Default level-up choices. First card previews the planned Fireball upgrade;
+// the rest are placeholders. Future builds will populate these from an
+// upgrade/affinity/fusion system and apply real effects on selection.
+const DEFAULT_CARDS = [
+  { title: "Upgrade Fireball", desc: "Damage +5 · Size +10% · Cooldown -5%" },
+  { title: "Future Skill", desc: "Coming soon" },
+  { title: "Future Skill", desc: "Coming soon" },
+];
+
 export class LevelUpUI {
   /**
    * @param {Phaser.Scene} scene
@@ -42,9 +51,9 @@ export class LevelUpUI {
     // Three placeholder cards.
     this.cards = [];
     const startX = cx - CARD_W - CARD_GAP / 2;
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < DEFAULT_CARDS.length; i++) {
       const x = startX + i * (CARD_W + CARD_GAP);
-      this.cards.push(this.createCard(x, cy, i));
+      this.cards.push(this.createCard(x, cy, DEFAULT_CARDS[i], i));
     }
 
     // Continue button
@@ -63,19 +72,19 @@ export class LevelUpUI {
     this.hide();
   }
 
-  createCard(x, y, index) {
+  createCard(x, y, def, index) {
     const bg = this.scene.add.rectangle(x, y, CARD_W, CARD_H, 0x141826, 0.95)
       .setScrollFactor(0).setDepth(2001).setInteractive({ useHandCursor: true });
     bg.setStrokeStyle(2, 0x3a2d63);
 
-    const titleText = this.scene.add.text(x, y - 100, `UPGRADE ${index + 1}`, {
+    const titleText = this.scene.add.text(x, y - 100, def.title, {
       fontFamily: "Segoe UI, sans-serif",
       fontSize: "20px",
       color: "#e6e8ef",
       fontStyle: "bold",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(2002);
 
-    const descText = this.scene.add.text(x, y, "Coming soon", {
+    const descText = this.scene.add.text(x, y, def.desc, {
       fontFamily: "Segoe UI, sans-serif",
       fontSize: "14px",
       color: "#8a8f9c",

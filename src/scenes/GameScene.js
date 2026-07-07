@@ -1,8 +1,9 @@
 /* ==========================================================================
    Etherfall - Game Scene
    The playable core. Owns the world ("The Forgotten Meadow"), player, enemies,
-   camera, HUD and the level-up flow. This is v0.0.3: enemies MOVE, SEPARATE
-   like a swarm, deal contact damage, and can be defeated (HP -> death -> EXP).
+   camera, HUD and the level-up flow. This is v0.0.4: the player AUTO-CASTS
+   magic (Fireball) at the nearest enemy; projectiles deal elemental damage,
+   enemies separate like a swarm, deal contact damage, and die (HP -> EXP).
 
    Systems used:
      - InputManager   : movement + pause input
@@ -21,14 +22,17 @@ import {
   WORLD,
   TEXTURE_KEYS,
   COMBAT,
+  PROJECTILE_POOL,
 } from "../config/constants.js";
 import { EVENTS } from "../utils/events.js";
 import { Player } from "../entities/Player.js";
 import { Enemy } from "../entities/Enemy.js";
+import { Projectile } from "../entities/Projectile.js";
 import { EnemyManager } from "../entities/EnemyManager.js";
 import { InputManager } from "../managers/InputManager.js";
 import { LevelSystem } from "../systems/LevelSystem.js";
 import { DamageSystem } from "../systems/DamageSystem.js";
+import { MagicSystem } from "../systems/MagicSystem.js";
 import { HUD } from "../ui/HUD.js";
 import { LevelUpUI } from "../ui/LevelUpUI.js";
 
@@ -53,6 +57,14 @@ export class GameScene extends Phaser.Scene {
     (data.enemy?.enemies || []).forEach((d) => {
       this.enemyDefs[d.name] = d;
     });
+
+    // Element -> tint colour lookup (from data/elements.json).
+    this.elementColors = {};
+    const elementData = (data.elements && data.elements.elements) || {};
+    for (const key in elementData) {
+      const c = Phaser.Display.Color.HexStringToColor(elementData[key].color);
+      this.elementColors[key] = c.color;
+    }
 
     // --- World (large bounded arena) ---
     const worldW = mapDef.width || WORLD.WIDTH;
@@ -108,6 +120,29 @@ export class GameScene extends Phaser.Scene {
       this
     );
 
+    // --- Projectiles (pooled magic shots) + auto-attack ---
+    this.projectiles = this.physics.add.group({
+      classType: Projectile,
+      runChildUpdate: false,
+      maxSize: PROJECTILE_POOL,
+    });
+    this.magicSystem = new MagicSystem(
+      this,
+      this.player,
+      this.projectiles,
+      this.enemies,
+      this.damageSystem,
+      this.elementColors
+    );
+    // Projectile vs enemy overlap: damage + hit effect, then despawn shot.
+    this.physics.add.overlap(
+      this.projectiles,
+      this.enemies,
+      this.onProjectileHitEnemy,
+      null,
+      this
+    );
+
     // --- UI ---
     this.hud = new HUD(this);
     this.levelUpUI = new LevelUpUI(this);
@@ -120,11 +155,13 @@ export class GameScene extends Phaser.Scene {
     // --- State flags ---
     this.leveling = false; // a level-up overlay is open
     this.runTime = 0; // ms of active play
+    this.damageEvents = 0; // debug counter
 
     // --- Event wiring ---
     this.game.events.on(EVENTS.LEVEL_UP, this.onLevelUp, this);
     this.game.events.on(EVENTS.PLAYER_DIED, this.onPlayerDied, this);
     this.game.events.on(EVENTS.ENTITY_DIED, this.onEntityDied, this);
+    this.game.events.on(EVENTS.DAMAGE_DEALT, this.onDamageDealt, this);
     this.events.once("shutdown", this.onShutdown, this);
   }
 
@@ -150,6 +187,13 @@ export class GameScene extends Phaser.Scene {
       velX: Math.round(this.player.body.velocity.x),
       velY: Math.round(this.player.body.velocity.y),
       colliding: this.player.isInvincible(),
+      // Magic / projectiles (HUD + debug)
+      magicName: this.magicSystem.activeName,
+      magicElement: this.magicSystem.active ? this.magicSystem.active.element : "",
+      magicReady: this.magicSystem.isReady,
+      magicCdMs: this.magicSystem.cooldownRemaining,
+      projectiles: this.projectiles.countActive(true),
+      damageEvents: this.damageEvents,
       debug: this.debug,
     });
 
@@ -176,6 +220,13 @@ export class GameScene extends Phaser.Scene {
     const children = this.enemies.getChildren();
     for (let i = 0; i < children.length; i++) {
       if (children[i].active) children[i].tick();
+    }
+
+    // Auto-attack magic + projectile movement.
+    this.magicSystem.update(delta);
+    const pchildren = this.projectiles.getChildren();
+    for (let i = 0; i < pchildren.length; i++) {
+      if (pchildren[i].active) pchildren[i].tick(delta);
     }
   }
 
@@ -205,7 +256,8 @@ export class GameScene extends Phaser.Scene {
       this.game.events.emit(EVENTS.PLAYER_DAMAGED, player);
     }
 
-    // Player -> Enemy (throttled per enemy via damageCooldown).
+    // Player -> Enemy (throttled per enemy via damageCooldown). Kept as a
+    // fallback melee so swarms still hurt even with no spell equipped.
     if (now - enemy.lastContact >= player.damageCooldown) {
       enemy.lastContact = now;
       this.damageSystem.applyDamage(enemy, player.contactDamage, {
@@ -213,6 +265,65 @@ export class GameScene extends Phaser.Scene {
         source: player,
       });
     }
+  }
+
+  /**
+   * Projectile hit an enemy: apply elemental damage via the unified
+   * DamageSystem, spawn a hit effect, then return the projectile to the pool.
+   */
+  onProjectileHitEnemy(projectile, enemy) {
+    if (!projectile.active || !enemy.active) return;
+    const color = this.elementColors[projectile.element] ?? 0xffffff;
+    this.damageSystem.applyDamage(enemy, projectile.damage, {
+      type: "element",
+      element: projectile.element,
+      source: projectile,
+    });
+    this.spawnHitEffect(enemy.x, enemy.y, color);
+    projectile.despawn();
+  }
+
+  /** Damage feedback: count events + float a coloured "-N" number. */
+  onDamageDealt(target, dealt, source) {
+    this.damageEvents++;
+    const color = (source && source.element && this.elementColors[source.element]) || 0xffffff;
+    this.spawnDamageNumber(target.x, target.y - (target.radius || 16) - 6, dealt, color);
+  }
+
+  /** Floating damage number that rises and fades. */
+  spawnDamageNumber(x, y, amount, color) {
+    const t = this.add
+      .text(x, y, `-${amount}`, {
+        fontFamily: "Segoe UI, sans-serif",
+        fontSize: "16px",
+        color: "#ffffff",
+        fontStyle: "bold",
+      })
+      .setOrigin(0.5)
+      .setDepth(50)
+      .setTint(color);
+    this.tweens.add({
+      targets: t,
+      y: y - 28,
+      alpha: 0,
+      duration: 600,
+      onComplete: () => t.destroy(),
+    });
+  }
+
+  /** Small additive burst where a projectile connects. */
+  spawnHitEffect(x, y, color) {
+    const burst = this.add
+      .circle(x, y, 12, color, 0.8)
+      .setDepth(6)
+      .setBlendMode(Phaser.BlendModes.ADD);
+    this.tweens.add({
+      targets: burst,
+      scale: 0,
+      alpha: 0,
+      duration: 200,
+      onComplete: () => burst.destroy(),
+    });
   }
 
   /**
@@ -272,5 +383,6 @@ export class GameScene extends Phaser.Scene {
     this.game.events.off(EVENTS.LEVEL_UP, this.onLevelUp, this);
     this.game.events.off(EVENTS.PLAYER_DIED, this.onPlayerDied, this);
     this.game.events.off(EVENTS.ENTITY_DIED, this.onEntityDied, this);
+    this.game.events.off(EVENTS.DAMAGE_DEALT, this.onDamageDealt, this);
   }
 }

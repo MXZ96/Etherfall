@@ -1,11 +1,11 @@
 # Etherfall
 
 A browser **Bullet-Heaven Roguelite** (top-down action RPG) built with **Phaser 3**
-and **vanilla ES Modules**. This repository is **version 0.0.3** — the living
-entity & combat foundation. Enemies swarm with soft separation, deal contact
-damage, and can be defeated (HP -> death -> EXP) while the player gets
-i-frames, knockback and blink feedback. Magic/projectiles/bosses are still
-future; just a clean, scalable architecture to grow into.
+and **vanilla ES Modules**. This repository is **version 0.0.4** — the Arcane
+Combat System. The player now AUTO-CASTS magic (Fireball) at the nearest enemy;
+projectiles deal elemental damage with glow/trail/hit effects, and floating
+damage numbers appear on hits. Water/Air/Earth/Spirit spells, affinity and
+fusion are still future; just a clean, scalable architecture to grow into.
 
 ## Running locally
 
@@ -48,15 +48,15 @@ etherfall/
 └── src/
     ├── config/           # constants.js, GameConfig.js
     ├── scenes/           # Boot, Preload, MainMenu, Game, Pause, GameOver
-    ├── entities/         # LivingEntity, Player, Enemy, EnemyManager
-    ├── systems/          # Save, Settings, Level, Damage
+    ├── entities/         # LivingEntity, Player, Enemy, Projectile, Magic, EnemyManager
+    ├── systems/          # Save, Settings, Level, Damage, Magic
     ├── managers/         # Input, Audio, Texture
     ├── ui/               # HUD, LevelUpUI
     ├── utils/            # math, events, leveling
     └── data/             # JSON content (player, enemy, maps, magic, ...)
 ```
 
-## How it works (v0.0.3)
+## How it works (v0.0.4)
 
 1. **BootScene** creates persistent managers (Save / Settings / Audio) on the
    global registry, then generates **all art procedurally** via `TextureManager`
@@ -67,7 +67,9 @@ etherfall/
 3. **MainMenuScene** -> **GameScene** starts a run in **The Forgotten Meadow**:
    a large bounded arena, a WASD/arrow-controlled player with eased movement,
    a camera that follows and centres the player, and an **EnemyManager** that
-   spawns Voidlings just outside the view; they chase the player.
+   spawns Voidlings just outside the view; they chase the player. The player
+   AUTO-CASTS Fireball (a pooled projectile from `data/magic.json`) at the
+   nearest enemy, dealing elemental damage with glow/trail/hit effects.
 4. A physics **collider** keeps enemies separated into a natural swarm. On
    contact, both sides use the unified **DamageSystem**: the Voidling deals
    contact damage (player gets 500ms i-frames, blink, knockback, screen shake)

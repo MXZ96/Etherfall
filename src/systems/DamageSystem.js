@@ -33,14 +33,22 @@ export class DamageSystem {
   /**
    * Apply `amount` damage to `target`.
    * @param {LivingEntity} target  must expose hp / onDamaged / onDeath
-   * @param {number} amount
+   * @param {number|object} amount  number, or a damage descriptor
+   *        { amount, type, element, critical, status, source }
    * @param {object} [source]  descriptor (type/element/critical/status/source)
    * @returns {boolean} true if this hit killed the target
    */
   applyDamage(target, amount, source = {}) {
     if (!target || target.dead) return false;
 
-    // Future: multiply by affinity/resistance/crit here.
+    // Allow callers to pass the whole descriptor as the first arg.
+    if (typeof amount === "object" && amount !== null) {
+      source = amount;
+      amount = source.amount ?? 0;
+    }
+
+    // Future: multiply by affinity/resistance/crit here. For elemental damage
+    // (type: "element") the `element` field drives future affinity modifiers.
     const dealt = Math.max(0, Math.round(amount));
     if (dealt <= 0) return false;
 
