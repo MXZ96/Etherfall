@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "maps": [
+    {
+      "id": "forgotten_meadow",
+      "name": "The Forgotten Meadow",
+      "theme": "dark_grass",
+      "width": 4000,
+      "height": 4000,
+      "background": "grass-tile",
+      "spawn": "center",
+      "description": "A cursed grassland where unstable Ether energy breeds Voidlings."
+    }
+  ]
+}

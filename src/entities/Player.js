@@ -1,15 +1,19 @@
 /* ==========================================================================
    Etherfall - Player Entity
-   Top-down controllable character. Owns its movement + core stats (HP, level,
-   EXP via the LevelSystem). Animation is driven by movement state.
+   Top-down controllable character. Movement uses smooth acceleration/decel-
+   eration (eased velocity) and normalised diagonals. Stats are loaded from
+   data/player.json so balancing is data-driven.
 
-   Progression (level/exp) lives in systems/LevelSystem.js and is surfaced to
-   the HUD/Level-Up UI; this entity stays focused on movement + stats. For
-   v0.0.1 there is NO damage handling yet (per scope).
+   Progression (level/exp) lives in systems/LevelSystem.js; this entity owns
+   combat stats (HP, mana, affinity, speed). For v0.0.2 there is NO damage
+   handling yet (per scope) — takeDamage() is a placeholder for future combat.
    ========================================================================== */
 
 import * as Phaser from "phaser";
 import { PLAYER, TEXTURE_KEYS } from "../config/constants.js";
+import { approach } from "../utils/math.js";
+
+const ACCELERATION = 1800; // px/s^2 - controls how snappy movement feels
 
 export class Player extends Phaser.Physics.Arcade.Sprite {
   /**
@@ -22,10 +26,14 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
-    // Stats
-    this.maxHp = PLAYER.MAX_HP;
-    this.hp = this.maxHp;
-    this.speed = PLAYER.SPEED;
+    // --- Stats from data/player.json (with constants-based fallbacks) ---
+    const def = (scene.registry.get("data") || {}).player || {};
+    this.maxHp = def.maxHP ?? PLAYER.MAX_HP;
+    this.hp = def.currentHP ?? this.maxHp;
+    this.speed = def.movementSpeed ?? PLAYER.SPEED;
+    this.maxMana = def.mana ?? 100;
+    this.mana = this.maxMana;
+    this.affinity = def.affinity ?? {};
 
     // Physics body (circle for fair top-down collisions)
     this.body.setCircle(PLAYER.RADIUS, this.width / 2 - PLAYER.RADIUS, this.height / 2 - PLAYER.RADIUS);
@@ -46,23 +54,27 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.moveVector = vec;
   }
 
-  /** Called each frame by the scene. Applies velocity + animation. */
-  tick() {
-    const v = this.moveVector;
-    const moving = v.x !== 0 || v.y !== 0;
+  /**
+   * Per-frame update. Eases the body velocity toward the input target so the
+   * player accelerates and decelerates smoothly (mobile-ready: the same
+   * vector could come from a virtual joystick later).
+   * @param {number} deltaMs
+   */
+  tick(deltaMs) {
+    const dt = deltaMs / 1000;
+    const targetVX = this.moveVector.x * this.speed;
+    const targetVY = this.moveVector.y * this.speed;
+    const maxStep = ACCELERATION * dt;
 
+    this.body.velocity.x = approach(this.body.velocity.x, targetVX, maxStep);
+    this.body.velocity.y = approach(this.body.velocity.y, targetVY, maxStep);
+
+    const moving = Math.abs(this.body.velocity.x) > 1 || Math.abs(this.body.velocity.y) > 1;
     if (moving) {
-      this.body.setVelocity(v.x * this.speed, v.y * this.speed);
-      if (this.anims.currentAnim?.key !== "player-walk") {
-        this.play("player-walk");
-      }
-      // Face left/right based on horizontal motion.
-      this.setFlipX(v.x < 0);
-    } else {
-      this.body.setVelocity(0, 0);
-      if (this.anims.currentAnim?.key !== "player-idle") {
-        this.play("player-idle");
-      }
+      if (this.anims.currentAnim?.key !== "player-walk") this.play("player-walk");
+      this.setFlipX(this.body.velocity.x < 0);
+    } else if (this.anims.currentAnim?.key !== "player-idle") {
+      this.play("player-idle");
     }
   }
 
@@ -72,11 +84,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   /**
-   * Placeholder for the future damage pipeline. No-op for v0.0.1.
+   * Placeholder for the future damage pipeline. No-op for v0.0.2.
    * @param {number} amount
    */
   takeDamage(amount) {
-    // TODO: implement once enemy attacks exist.
+    // TODO: implement once enemy attacks / contact damage exist.
     void amount;
   }
 }

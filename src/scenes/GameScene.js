@@ -1,20 +1,21 @@
 /* ==========================================================================
    Etherfall - Game Scene
-   The playable core. Owns the world, player, enemies, camera, HUD and the
-   level-up flow. Enemies only MOVE in v0.0.1 (no attacks/damage yet).
+   The playable core. Owns the world ("The Forgotten Meadow"), player, enemies,
+   camera, HUD and the level-up flow. This is v0.0.2: enemies MOVE and are
+   DEFEATED on contact (granting EXP) but deal NO damage yet.
 
    Systems used:
-     - InputManager      : movement + pause input
-     - LevelSystem       : EXP / level progression
-     - EnemySpawner      : periodic enemy spawning
-     - HUD / LevelUpUI   : presentation
-   Persistent managers (save/settings/audio) come from the registry.
+     - InputManager   : movement + pause input
+     - LevelSystem    : EXP / level progression
+     - EnemyManager   : data-driven spawning + lifecycle
+     - HUD / LevelUpUI: presentation
+   Persistent managers (save/settings/audio) come from the registry. World +
+   enemy definitions come from data/*.json via the registry.
    ========================================================================== */
 
 import * as Phaser from "phaser";
 import {
   CAMERA,
-  GAME,
   SCENES,
   WORLD,
   TEXTURE_KEYS,
@@ -22,9 +23,9 @@ import {
 import { EVENTS } from "../utils/events.js";
 import { Player } from "../entities/Player.js";
 import { Enemy } from "../entities/Enemy.js";
+import { EnemyManager } from "../entities/EnemyManager.js";
 import { InputManager } from "../managers/InputManager.js";
 import { LevelSystem } from "../systems/LevelSystem.js";
-import { EnemySpawner } from "../systems/EnemySpawner.js";
 import { HUD } from "../ui/HUD.js";
 import { LevelUpUI } from "../ui/LevelUpUI.js";
 
@@ -39,28 +40,44 @@ export class GameScene extends Phaser.Scene {
     this.settings = this.registry.get("settings");
     this.audio = this.registry.get("audio");
 
-    // --- World ---
-    this.physics.world.setBounds(0, 0, WORLD.WIDTH, WORLD.HEIGHT);
+    // --- Content from data/*.json ---
+    const data = this.registry.get("data") || {};
+    const mapDef =
+      (data.maps && data.maps.maps && data.maps.maps[0]) ||
+      { width: WORLD.WIDTH, height: WORLD.HEIGHT, background: TEXTURE_KEYS.GRASS };
+    const playerDef = data.player || {};
+    this.enemyDefs = {};
+    (data.enemy?.enemies || []).forEach((d) => {
+      this.enemyDefs[d.name] = d;
+    });
+
+    // --- World (large bounded arena) ---
+    const worldW = mapDef.width || WORLD.WIDTH;
+    const worldH = mapDef.height || WORLD.HEIGHT;
+    this.physics.world.setBounds(0, 0, worldW, worldH);
     this.add
-      .tileSprite(0, 0, WORLD.WIDTH, WORLD.HEIGHT, TEXTURE_KEYS.GRASS)
+      .tileSprite(0, 0, worldW, worldH, mapDef.background || TEXTURE_KEYS.GRASS)
       .setOrigin(0)
       .setDepth(-10);
 
     // --- Player (spawned at world centre) ---
-    this.player = new Player(this, WORLD.WIDTH / 2, WORLD.HEIGHT / 2);
+    this.player = new Player(this, worldW / 2, worldH / 2);
 
-    // --- Camera (follows player, keeps them centred) ---
+    // --- Camera (follows player, keeps them centred; zoom-ready) ---
     const cam = this.cameras.main;
-    cam.setBounds(0, 0, WORLD.WIDTH, WORLD.HEIGHT);
+    cam.setBounds(0, 0, worldW, worldH);
     cam.startFollow(this.player, true, CAMERA.LERP, CAMERA.LERP);
     cam.setZoom(CAMERA.ZOOM);
 
     // --- Input ---
     this.inputMgr = new InputManager(this);
 
-    // --- Progression ---
-    const startLevel = (this.save.getSection("player").level) || 1;
-    this.levelSystem = new LevelSystem(this.game, startLevel);
+    // --- Progression (start from player.json) ---
+    this.levelSystem = new LevelSystem(
+      this.game,
+      playerDef.level || 1,
+      playerDef.experience || 0
+    );
 
     // --- Enemies (physics group = pooling + overlap target) ---
     this.enemies = this.physics.add.group({
@@ -68,8 +85,8 @@ export class GameScene extends Phaser.Scene {
       runChildUpdate: false,
       maxSize: 300,
     });
-    this.spawner = new EnemySpawner(this, this.player, this.enemies);
-    this.spawner.setLevel(this.levelSystem.getLevel());
+    this.enemyManager = new EnemyManager(this, this.player, this.enemies, this.enemyDefs);
+    this.enemyManager.setLevel(this.levelSystem.getLevel());
 
     this.physics.add.overlap(
       this.player,
@@ -83,14 +100,14 @@ export class GameScene extends Phaser.Scene {
     this.hud = new HUD(this);
     this.levelUpUI = new LevelUpUI(this);
 
-    // --- Debug key: grant EXP to test the level-up flow (no kills yet). ---
-    this.debugExpKey = this.input.keyboard.addKey(
-      Phaser.Input.Keyboard.KeyCodes.E
-    );
+    // --- Debug: F1 toggles the debug overlay; E grants EXP (testing) ---
+    this.debug = false;
+    this.debugKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F1);
+    this.debugExpKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
 
     // --- State flags ---
     this.leveling = false; // a level-up overlay is open
-    this.gamePaused = false;
+    this.runTime = 0; // ms of active play
 
     // --- Event wiring ---
     this.game.events.on(EVENTS.LEVEL_UP, this.onLevelUp, this);
@@ -99,13 +116,23 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(time, delta) {
+    // Advance the run timer only while actively playing.
+    if (!this.leveling) this.runTime += delta;
+
     // HUD always reflects current state.
     this.hud.update({
       hp: this.player.hp,
       maxHp: this.player.maxHp,
       level: this.levelSystem.getLevel(),
+      exp: this.levelSystem.getExp(),
+      expRequired: this.levelSystem.getThreshold(),
       expProgress: this.levelSystem.getProgress(),
       fps: Math.round(this.game.loop.actualFps),
+      timeMs: this.runTime,
+      enemyCount: this.enemyManager.getActiveCount(),
+      playerX: this.player.x,
+      playerY: this.player.y,
+      debug: this.debug,
     });
 
     // While a level-up overlay is open the world is frozen.
@@ -117,21 +144,37 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    // Debug: simulate EXP gain (future: EXP from enemy kills).
-    if (Phaser.Input.Keyboard.JustDown(this.debugExpKey)) {
-      this.levelSystem.gainExp(60);
-    }
+    // Debug toggles.
+    if (Phaser.Input.Keyboard.JustDown(this.debugKey)) this.debug = !this.debug;
+    if (Phaser.Input.Keyboard.JustDown(this.debugExpKey)) this.levelSystem.gainExp(60);
 
-    // Player movement.
+    // Player movement (eased).
     const v = this.inputMgr.getMoveVector();
     this.player.setMoveInput(v);
-    this.player.tick();
+    this.player.tick(delta);
 
     // Enemy spawning + movement.
-    this.spawner.update(delta);
+    this.enemyManager.update(delta);
     const children = this.enemies.getChildren();
     for (let i = 0; i < children.length; i++) {
       if (children[i].active) children[i].tick();
+    }
+  }
+
+  // ------------------------------------------------------------------------
+  // Combat (placeholder pipeline for v0.0.2)
+  // ------------------------------------------------------------------------
+  /**
+   * Contact with an enemy "defeats" it and awards its EXP. No player damage
+   * yet (per scope) — this stand-in lets the level-up loop work until the
+   * real magic/combat system lands.
+   */
+  onPlayerEnemyOverlap(player, enemy) {
+    if (!enemy.active) return;
+    const reward = enemy.defeat();
+    if (reward > 0) {
+      this.levelSystem.gainExp(reward);
+      this.game.events.emit(EVENTS.ENEMY_KILLED, enemy);
     }
   }
 
@@ -148,7 +191,7 @@ export class GameScene extends Phaser.Scene {
   onLevelUpContinue() {
     this.leveling = false;
     this.physics.world.resume();
-    this.spawner.setLevel(this.levelSystem.getLevel());
+    this.enemyManager.setLevel(this.levelSystem.getLevel());
   }
 
   // ------------------------------------------------------------------------
@@ -162,11 +205,6 @@ export class GameScene extends Phaser.Scene {
 
   onPlayerDied() {
     this.scene.start(SCENES.GAME_OVER, { level: this.levelSystem.getLevel() });
-  }
-
-  /** Placeholder collision handler. No damage in v0.0.1. */
-  onPlayerEnemyOverlap() {
-    // TODO: future combat / contact damage pipeline.
   }
 
   /** Clean up global listeners so restarts don't double-bind. */

@@ -48,3 +48,14 @@ export function randomRange(min, max) {
 export function randomInt(min, max) {
   return Math.floor(randomRange(min, max + 1));
 }
+
+/**
+ * Move `current` toward `target` by at most `maxDelta` (smooth accel/decel).
+ * Used for the player's velocity so movement eases in/out instead of
+ * snapping. Returns the new value.
+ */
+export function approach(current, target, maxDelta) {
+  if (current < target) return Math.min(current + maxDelta, target);
+  if (current > target) return Math.max(current - maxDelta, target);
+  return target;
+}

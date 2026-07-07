@@ -17,6 +17,8 @@ const DATA_FILES = [
   "achievement",
   "weather",
   "event",
+  "player",
+  "maps",
 ];
 
 export class PreloadScene extends Phaser.Scene {

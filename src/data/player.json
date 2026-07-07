@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "level": 1,
+  "experience": 0,
+  "experienceRequired": 100,
+  "maxHP": 100,
+  "currentHP": 100,
+  "movementSpeed": 200,
+  "mana": 100,
+  "affinity": {}
+}

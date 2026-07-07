@@ -1,26 +1,24 @@
 /* ==========================================================================
    Etherfall - Progression Formula
-   Exponential EXP curve. The requirement to advance FROM `level` to the next
-   grows geometrically, keeping early levels quick and late levels lengthy.
+   Scalable, non-hardcoded EXP curve. The requirement to advance FROM `level`
+   to the next grows by a fixed step each level (an arithmetic progression),
+   which reproduces the v0.0.2 spec example exactly:
 
-   expToNext(level) = round(BASE * GROWTH ^ (level - 1))
+     expToNext(level) = EXP.BASE + EXP.STEP * (level - 1)
 
-   Example curve (BASE=100, GROWTH=1.5):
-     L1->L2 : 100
-     L2->L3 : 150
-     L3->L4 : 225
-     L4->L5 : 338
-   This is scalable and trivially re-balanced by editing the two constants.
+     L1->L2 : 100   L2->L3 : 150   L3->L4 : 200
+     cumulative to reach a level: L1=0  L2=100  L3=250  L4=450
+
+   To swap in a steeper exponential curve later, edit expToNext() only.
    ========================================================================== */
 
-const BASE = 100;
-const GROWTH = 1.5;
+import { EXP } from "../config/constants.js";
 
 /**
  * EXP required to go from `level` to `level + 1`.
  */
 export function expToNext(level) {
-  return Math.round(BASE * Math.pow(GROWTH, level - 1));
+  return EXP.BASE + EXP.STEP * (level - 1);
 }
 
 /**

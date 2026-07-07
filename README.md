@@ -1,8 +1,9 @@
 # Etherfall
 
 A browser **Bullet-Heaven Roguelite** (top-down action RPG) built with **Phaser 3**
-and **vanilla ES Modules**. This repository is **version 0.0.1** — the foundational
-framework only. No magic, enemies-with-attacks, bosses, or artifacts yet; just a
+and **vanilla ES Modules**. This repository is **version 0.0.2** — the core
+gameplay foundation. Enemies spawn and chase, and defeating them grants EXP,
+but there are still no attacks, damage, bosses, or artifacts yet; just a
 clean, scalable architecture to grow into.
 
 ## Running locally
@@ -46,27 +47,31 @@ etherfall/
 └── src/
     ├── config/           # constants.js, GameConfig.js
     ├── scenes/           # Boot, Preload, MainMenu, Game, Pause, GameOver
-    ├── entities/         # Player, Enemy
-    ├── systems/          # Save, Settings, Level, EnemySpawner
+    ├── entities/         # Player, Enemy, EnemyManager
+    ├── systems/          # Save, Settings, Level
     ├── managers/         # Input, Audio, Texture
     ├── ui/               # HUD, LevelUpUI
     ├── utils/            # math, events, leveling
-    └── data/             # JSON content (magic, fusion, enemy, ...)
+    └── data/             # JSON content (player, enemy, maps, magic, ...)
 ```
 
-## How it works (v0.0.1)
+## How it works (v0.0.2)
 
 1. **BootScene** creates persistent managers (Save / Settings / Audio) on the
    global registry, then generates **all art procedurally** via `TextureManager`
    so the game ships with zero binary assets.
-2. **PreloadScene** loads every `src/data/*.json` file and stores them on the
-   registry as the single source of truth for future content.
-3. **MainMenuScene** -> **GameScene** starts the run: a large bounded world,
-   a WASD/arrow-controlled player, a camera that follows and centres the player,
-   and an `EnemySpawner` that walks basic enemies toward the player.
-4. The **LevelSystem** tracks EXP with an exponential curve. On level-up the
-   game pauses and the **LevelUpUI** overlay shows three placeholder cards.
+2. **PreloadScene** loads every `src/data/*.json` file (player, enemy, maps,
+   magic, fusion, boss, artifact, achievement, weather, event) and stores them
+   on the registry as the single source of truth for content.
+3. **MainMenuScene** -> **GameScene** starts a run in **The Forgotten Meadow**:
+   a large bounded arena, a WASD/arrow-controlled player with eased movement,
+   a camera that follows and centres the player, and an **EnemyManager** that
+   spawns Voidlings just outside the view; they chase the player.
+4. Touching a Voidling **defeats** it and awards EXP (no player damage yet). The
+   **LevelSystem** tracks EXP with a scalable curve; on level-up the game pauses
+   and the **LevelUpUI** overlay shows three placeholder cards.
 5. **PauseScene** (Esc/P) overlays resume / fullscreen / quit options.
+   Press **F1** for the debug overlay (FPS, coords, level, EXP, enemy count).
 
 ## Future systems (architecture is ready)
 

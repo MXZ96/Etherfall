@@ -1,6 +1,6 @@
 /* ==========================================================================
    Etherfall - Level / Progression System
-   Authority for the player's level and EXP. Uses the exponential formula in
+   Authority for the player's level and EXP. Uses the scalable formula in
    utils/leveling.js. Emits EXP_GAINED and LEVEL_UP on the game event bus so
    the HUD and Level-Up UI can react. Does NOT own UI; it only models state.
    ========================================================================== */
@@ -14,10 +14,10 @@ export class LevelSystem {
    * @param {Phaser.Game} game
    * @param {number} startLevel
    */
-  constructor(game, startLevel = 1) {
+  constructor(game, startLevel = 1, startExp = 0) {
     this.game = game;
     this.level = startLevel;
-    this.exp = 0; // EXP accumulated toward the next level
+    this.exp = startExp; // EXP accumulated toward the next level
     this.threshold = expToNext(this.level);
   }
 
