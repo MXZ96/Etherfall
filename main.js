@@ -7,12 +7,12 @@
 import * as Phaser from "phaser";
 import { GAME_CONFIG } from "./src/config/GameConfig.js";
 
-import BootScene from "./src/scenes/BootScene.js";
-import PreloadScene from "./src/scenes/PreloadScene.js";
-import MainMenuScene from "./src/scenes/MainMenuScene.js";
-import GameScene from "./src/scenes/GameScene.js";
-import PauseScene from "./src/scenes/PauseScene.js";
-import GameOverScene from "./src/scenes/GameOverScene.js";
+import { BootScene } from "./src/scenes/BootScene.js";
+import { PreloadScene } from "./src/scenes/PreloadScene.js";
+import { MainMenuScene } from "./src/scenes/MainMenuScene.js";
+import { GameScene } from "./src/scenes/GameScene.js";
+import { PauseScene } from "./src/scenes/PauseScene.js";
+import { GameOverScene } from "./src/scenes/GameOverScene.js";
 
 // Register every scene. Order here is not load order; scenes are started
 // explicitly from one another.
