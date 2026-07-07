@@ -1,22 +1,22 @@
 /* ==========================================================================
-   Etherfall - Enemy Entity (data-driven, movement-only)
-   A single Enemy instance is pooled and (re)configured from an entry in
-   data/enemy.json via spawnAt(). For v0.0.2 it only WALKS toward the player
-   (no attacks / no damage yet).
+   Etherfall - Enemy Entity (data-driven, living)
+   Built on LivingEntity so it shares the combat/knockback contract with the
+   player and future bosses/summons. A single Enemy instance is pooled and
+   (re)configured from data/enemy.json via spawnAt().
 
-   Future versions will drive behaviour (attacks, affinities, abilities) from
-   the same enemy definition, keeping this class generic.
+   For v0.0.3 it walks toward the player and deals contact damage; it can also
+   be defeated (HP reaches 0) which awards EXP and a death effect.
    ========================================================================== */
 
 import * as Phaser from "phaser";
 import { ENEMY, TEXTURE_KEYS } from "../config/constants.js";
+import { LivingEntity } from "./LivingEntity.js";
 
-export class Enemy extends Phaser.Physics.Arcade.Sprite {
+export class Enemy extends LivingEntity {
   /**
    * NOTE: enemies are created by an Arcade physics group (see EnemyManager /
-   * GameScene). The group adds the sprite to the scene and enables its
-   * physics body AFTER the constructor runs, so body setup happens in
-   * spawnAt() instead of here.
+   * GameScene). The group adds the sprite to the scene and enables its physics
+   * body AFTER the constructor runs, so body setup happens in spawnAt().
    * @param {Phaser.Scene} scene
    * @param {number} x
    * @param {number} y
@@ -26,6 +26,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.setDepth(5);
     this.target = null;
     this.def = null;
+    this.lastContact = 0; // throttle for player-dealt contact damage
   }
 
   /**
@@ -34,20 +35,24 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
    * @param {number} x
    * @param {number} y
    * @param {Player} player
-   * @param {object} def  enemy definition (hp, speed, experienceReward, ...)
+   * @param {object} def  enemy definition (hp, speed, damage, ...)
    */
   spawnAt(x, y, player, def) {
     this.def = def;
     this.maxHp = def.hp ?? 20;
     this.hp = this.maxHp;
+    this.dead = false;
     this.speed = def.speed ?? ENEMY.SPEED;
     this.experienceReward = def.experienceReward ?? ENEMY.EXP_REWARD;
     this.damage = def.damage ?? 0;
+    this.attackCooldown = def.attackCooldown ?? 1000;
+    this.knockbackResistance = def.knockbackResistance ?? 0;
     this.radius = def.radius ?? ENEMY.RADIUS;
 
     this.target = player;
     this.enableBody(true, x, y, true, true);
     this.body.setCircle(this.radius, 3, 3); // centred on the 34x34 sprite
+    this.clearTint();
     this.setActive(true).setVisible(true);
   }
 
@@ -57,21 +62,18 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.disableBody(true, true);
   }
 
-  /**
-   * Defeat this enemy: remove it from play and return the EXP it awards.
-   * Called by the combat/overlap pipeline. No-op if already inactive.
-   * @returns {number} EXP awarded (0 if already dead)
-   */
-  defeat() {
-    if (!this.active) return 0;
-    const reward = this.experienceReward;
+  /** Hit feedback: white flash. */
+  onDamaged() {
+    this.flashHit(70);
+  }
+
+  /** Death cleanup: return to pool (visual effect is spawned by GameScene). */
+  onDeath() {
     this.despawn();
-    return reward;
   }
 
   /**
    * Per-frame movement. Walks straight toward the player target.
-   * (No attack logic yet.)
    */
   tick() {
     if (!this.active || !this.target) return;

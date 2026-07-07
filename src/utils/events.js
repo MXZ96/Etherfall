@@ -19,6 +19,11 @@ export const EVENTS = {
   ENEMY_SPAWNED: "enemy:spawned",
   ENEMY_KILLED: "enemy:killed",
 
+  // Combat
+  DAMAGE_DEALT: "combat:damage-dealt",
+  ENTITY_DIED: "combat:entity-died",
+  PLAYER_DAMAGED: "player:damaged",
+
   // UI / Flow
   GAME_PAUSED: "flow:paused",
   GAME_RESUMED: "flow:resumed",

@@ -6,6 +6,9 @@
   "maxHP": 100,
   "currentHP": 100,
   "movementSpeed": 200,
+  "contactDamage": 6,
+  "damageCooldown": 350,
+  "knockbackResistance": 0,
   "mana": 100,
   "affinity": {}
 }

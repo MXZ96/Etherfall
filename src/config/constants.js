@@ -39,6 +39,14 @@ export const EXP = {
   STEP: 50,
 };
 
+// Combat tuning (v0.0.3). Knockback is an impulse (px/s) reduced by an
+// entity's knockbackResistance (0 = full push, 1 = immune).
+export const COMBAT = {
+  PLAYER_IFRAME_MS: 500, // invincibility after taking a hit
+  KNOCKBACK_FORCE: 260, // impulse applied to the player on contact
+  CONTACT_DAMAGE_FALLBACK: 5, // used if player.json omits contactDamage
+};
+
 // Enemy spawning tuning (used by EnemyManager).
 export const SPAWN = {
   MARGIN: 80, // px outside the camera view where enemies appear

@@ -99,10 +99,14 @@ export class HUD {
     if (s.debug) {
       this.debugText.setText(
         `FPS ${s.fps}\n` +
-        `POS ${Math.round(s.playerX)}, ${Math.round(s.playerY)}\n` +
+        `ENTITIES ${s.entityCount}\n` +
+        `ENEMIES ${s.enemyCount}\n` +
+        `PLAYER HP ${Math.ceil(s.playerHp)} / ${s.maxHp}\n` +
+        `VEL ${s.velX}, ${s.velY}\n` +
+        `COLLISION ${s.colliding ? "INVULN" : "clear"}\n` +
         `LVL ${s.level}\n` +
         `EXP ${s.exp} / ${s.expRequired}\n` +
-        `ENEMIES ${s.enemyCount}`
+        `POS ${Math.round(s.playerX)}, ${Math.round(s.playerY)}`
       );
     }
   }

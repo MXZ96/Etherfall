@@ -1,10 +1,11 @@
 # Etherfall
 
 A browser **Bullet-Heaven Roguelite** (top-down action RPG) built with **Phaser 3**
-and **vanilla ES Modules**. This repository is **version 0.0.2** — the core
-gameplay foundation. Enemies spawn and chase, and defeating them grants EXP,
-but there are still no attacks, damage, bosses, or artifacts yet; just a
-clean, scalable architecture to grow into.
+and **vanilla ES Modules**. This repository is **version 0.0.3** — the living
+entity & combat foundation. Enemies swarm with soft separation, deal contact
+damage, and can be defeated (HP -> death -> EXP) while the player gets
+i-frames, knockback and blink feedback. Magic/projectiles/bosses are still
+future; just a clean, scalable architecture to grow into.
 
 ## Running locally
 
@@ -47,15 +48,15 @@ etherfall/
 └── src/
     ├── config/           # constants.js, GameConfig.js
     ├── scenes/           # Boot, Preload, MainMenu, Game, Pause, GameOver
-    ├── entities/         # Player, Enemy, EnemyManager
-    ├── systems/          # Save, Settings, Level
+    ├── entities/         # LivingEntity, Player, Enemy, EnemyManager
+    ├── systems/          # Save, Settings, Level, Damage
     ├── managers/         # Input, Audio, Texture
     ├── ui/               # HUD, LevelUpUI
     ├── utils/            # math, events, leveling
     └── data/             # JSON content (player, enemy, maps, magic, ...)
 ```
 
-## How it works (v0.0.2)
+## How it works (v0.0.3)
 
 1. **BootScene** creates persistent managers (Save / Settings / Audio) on the
    global registry, then generates **all art procedurally** via `TextureManager`
@@ -67,11 +68,14 @@ etherfall/
    a large bounded arena, a WASD/arrow-controlled player with eased movement,
    a camera that follows and centres the player, and an **EnemyManager** that
    spawns Voidlings just outside the view; they chase the player.
-4. Touching a Voidling **defeats** it and awards EXP (no player damage yet). The
-   **LevelSystem** tracks EXP with a scalable curve; on level-up the game pauses
-   and the **LevelUpUI** overlay shows three placeholder cards.
-5. **PauseScene** (Esc/P) overlays resume / fullscreen / quit options.
-   Press **F1** for the debug overlay (FPS, coords, level, EXP, enemy count).
+4. A physics **collider** keeps enemies separated into a natural swarm. On
+   contact, both sides use the unified **DamageSystem**: the Voidling deals
+   contact damage (player gets 500ms i-frames, blink, knockback, screen shake)
+   and the player wears it down for EXP. Death spawns a fade effect.
+5. The **LevelSystem** tracks EXP with a scalable curve; on level-up the game
+   pauses and the **LevelUpUI** overlay shows three placeholder cards.
+6. **PauseScene** (Esc/P) overlays resume / fullscreen / quit options.
+   Press **F1** for the debug overlay (entities, enemies, HP, velocity, collision).
 
 ## Future systems (architecture is ready)
 

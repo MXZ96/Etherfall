@@ -64,3 +64,19 @@ saves keep loading.
 - All art is generated at runtime in `managers/TextureManager.js`. Swap these
   for real assets later without touching gameplay code — texture keys in
   `config/constants.js` stay the same.
+
+## Living entities & combat (v0.0.3)
+
+- `entities/LivingEntity.js` is the shared base for every combat-capable thing
+  (Player, Enemy, future Boss / Summon / Projectile). It owns the common
+  contract: `hp/maxHp`, `speed`, `radius`, `knockbackResistance`, a centred
+  circular body, `applyKnockback()` (scaled by resistance) and `flashHit()`.
+- `systems/DamageSystem.js` is the single `applyDamage(target, amount, source)`
+  entry point. `source` already carries `type` (physical/magic/element),
+  `element`, `critical` and `status` so affinity / crit / status effects can be
+  layered in without touching call sites.
+- Enemy-enemy **separation** is a physics collider (broadphase-backed, scales to
+  hundreds of entities) rather than a manual O(n²) loop, so swarms flow without
+  stacking. Player↔enemy uses an overlap (player is never physically blocked).
+- Death flows through `onDeath()` hooks + the `combat:entity-died` event, which
+  awards EXP and spawns a lightweight fade effect — keeping pooling clean.
