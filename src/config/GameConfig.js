@@ -4,6 +4,7 @@
    its aspect ratio on desktop, tablet and mobile browsers.
    ========================================================================== */
 
+import * as Phaser from "phaser";
 import { GAME } from "./constants.js";
 
 export const GAME_CONFIG = {
