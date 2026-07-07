@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0b0d12" />
+  <title>Etherfall</title>
+  <link rel="stylesheet" href="style.css" />
+
+  <!--
+    Import map so our ES Modules can `import Phaser from 'phaser'`
+    without a bundler. Works directly on GitHub Pages / any static host.
+  -->
+  <script type="importmap">
+  {
+    "imports": {
+      "phaser": "https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.esm.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="game-root">
+    <div id="game-container"></div>
+  </div>
+  <noscript>Etherfall requires JavaScript to run.</noscript>
+  <script type="module" src="main.js"></script>
+</body>
+</html>
