@@ -1,7 +1,39 @@
 {
   "version": 1,
-  "affinity": {
-    "note": "Future system: per-element affinity that scales damage, status chance and unlocks fusion paths. Reserved for v0.0.6+.",
-    "entries": []
+  "fire": {
+    "level": 0,
+    "experience": 0,
+    "maxLevel": 50,
+    "unlocked": true,
+    "locked": false
+  },
+  "water": {
+    "level": 0,
+    "experience": 0,
+    "maxLevel": 50,
+    "unlocked": false,
+    "locked": false
+  },
+  "air": {
+    "level": 0,
+    "experience": 0,
+    "maxLevel": 50,
+    "unlocked": false,
+    "locked": false
+  },
+  "earth": {
+    "level": 0,
+    "experience": 0,
+    "maxLevel": 50,
+    "unlocked": false,
+    "locked": false
+  },
+  "spirit": {
+    "level": 0,
+    "experience": 0,
+    "maxLevel": 50,
+    "unlocked": false,
+    "locked": true,
+    "hidden": true
   }
 }

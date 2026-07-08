@@ -1,15 +1,16 @@
 # Etherfall
 
 A browser **Bullet-Heaven Roguelite** (top-down action RPG) built with **Phaser 3**
-and **vanilla ES Modules**. This repository is **version 0.0.5.1** — the
-Balance & Progression Polish Patch. The player AUTO-CASTS Fireball at the
-nearest enemy; on level-up the game pauses and offers three rarity-weighted
-spell upgrades (damage, projectiles, cooldown, size, burn, explode, return)
-that permanently level up the spell and build a run. Progression is now bounded
-by per-spell `limits` (max projectiles / damage / size / cooldown), per-upgrade
-`maxStacks`, and a diminishing-returns curve so builds can't scale infinitely.
-Enemies scale smoothly with survival time + player level to keep the player
-challenged. Water/Air/Earth spells are registered and prepared for multi-slot
+and **vanilla ES Modules**. This repository is **version 0.0.6** — the Affinity
+System & Elemental Progression Foundation. The player AUTO-CASTS Fireball at
+the nearest enemy; on level-up the game pauses and offers three rarity-weighted
+spell upgrades. Separately from character EXP, killing enemies with an element's
+magic grants **Affinity EXP** to that element (Fire starts unlocked; Water/Air/
+Earth/Spirit are locked and prepared for future discovery). Fire affinity already
+pays off: **Lv10 +10% Fire damage**, **Lv20 base Burn chance**, with Lv30/40/50
+milestones reserved for future effects. Progression is bounded by per-spell
+`limits`, per-upgrade `maxStacks`, diminishing returns, and an intentionally
+slow affinity curve (Lv50 is a long-term achievement).
 loadouts; Spirit stays locked. Affinity and fusion are still future.
 
 ## Running locally
@@ -91,30 +92,40 @@ etherfall/
     +1 projectile) through Legendary (Phoenix Core boomerang, maxStacks 1).
     Multi-projectile fan-spread, burn-on-hit, Inferno explosion and Phoenix
     return are all driven by `data/upgrades.json` + the element/status-effect data.
- 6. **EnemyManager** applies smooth, sub-exponential **enemy scaling** from
-    survival time + player level, so Voidlings grow tougher (HP/damage) the
-    longer the run lasts — keeping the player challenged without runaway spikes.
- 7. **MainMenuScene** shows **START RUN** + **SETTINGS**; a **CONTINUE** button
-    appears only when a valid save exists (`SaveSystem.hasSave()`). The save
-    document already reserves `progress` (highestLevel, unlockedElements,
-    discoveredSpells, achievements) for a future full save system.
- 8. **PauseScene** (Esc/P) overlays resume / fullscreen / quit options.
-    Press **F1** for the debug overlay (entities, enemies, HP, velocity, collision,
-    owned spells + levels, per-spell multipliers, upgrade stacks, enemy scale,
-    element, projectile count).
+  6. **EnemyManager** applies smooth, sub-exponential **enemy scaling** from
+     survival time + player level, so Voidlings grow tougher (HP/damage) the
+     longer the run lasts — keeping the player challenged without runaway spikes.
+  7. **AffinitySystem** (v0.0.6) tracks the player's relationship with each
+     element independently of character level. Killing an enemy with an element's
+     magic grants that element **Affinity EXP** (half the enemy's EXP reward,
+     separate from character EXP). Fire starts unlocked; Water/Air/Earth are
+     registered but locked (future `unlockElement()`), and Spirit is hidden+locked.
+     Implemented, safe Fire bonuses: **Lv10 +10% Fire damage**, **Lv20 base Burn
+     chance**; Lv30/40/50 milestones are framework-only placeholders.
+  8. **MainMenuScene** shows **START RUN** + **SETTINGS**; a **CONTINUE** button
+     appears only when a valid save exists (`SaveSystem.hasSave()`). The save
+     document already reserves `progress` (highestLevel, unlockedElements,
+     discoveredSpells, achievements) for a future full save system.
+  9. **PauseScene** (Esc/P) overlays resume / fullscreen / quit options.
+     Press **F1** for the debug overlay (character level, per-element affinity
+     levels + Spirit status, entities, enemies, HP, velocity, collision, owned
+     spells + levels, per-spell multipliers, upgrade stacks, enemy scale,
+     element, projectile count). The bottom-left HUD shows the live affinity list
+     (e.g. 🔥 Fire Lv12 / 💧 Water Locked).
 
 ## Future systems (architecture is ready)
 
 The data files and folder layout already anticipate:
 
-- **Elements / Status** — `data/elements.json`, `data/status_effect.json` (Spirit locked)
+- **Elements / Status** — `data/elements.json` (unlocked/hidden/locked + affinity unlock reqs), `data/status_effect.json` (Spirit hidden+locked)
 - **Upgrades / Rarity** — `data/upgrades.json` (Common→Legendary weights + colours)
-- **Magic / Fusion** — `data/magic.json`, `data/fusion.json` (multi-slot ready)
-- **Affinity** — `data/affinity.json` (reserved for per-element scaling)
+- **Affinity** — `data/affinity.json` (per-element level/exp/maxLevel/locked) + `src/systems/AffinitySystem.js`
+- **Fusion** — `data/fusion.json` (`fusions[]` with element pairs + affinity requirements; not yet implemented)
+- **Magic** — `data/magic.json` (multi-slot ready; Water Bolt / Wind Blade / Rock Spike registered, Fireball active)
 - **Enemies / Bosses** — `data/enemy.json`, `data/boss.json` (Enemy is data-driven ready)
 - **Artifacts / Achievements** — `data/artifact.json`, `data/achievement.json`
 - **Weather / Events** — `data/weather.json`, `data/event.json`
-- **Spell Evolution / All-Rounder**, **Multiplayer** — manager/registry seams are in place
+- **Spell Evolution / All-Rounder / Element Unlock**, **Multiplayer** — manager/registry seams are in place
 - **Audio** — `AudioManager` buses (master/music/sfx) wired to settings
 
 Saving (localStorage) is versioned and sectioned so new systems can extend the

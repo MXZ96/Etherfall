@@ -26,6 +26,23 @@ const ELEMENT_EMOJI = {
   spirit: "✨",
 };
 
+// Element -> emoji/name for the affinity (elemental progression) HUD list.
+const AFFINITY_EMOJI = {
+  fire: "🔥",
+  water: "💧",
+  air: "🌪",
+  earth: "🌍",
+  spirit: "👻",
+};
+
+const AFFINITY_NAMES = {
+  fire: "Fire",
+  water: "Water",
+  air: "Air",
+  earth: "Earth",
+  spirit: "Spirit",
+};
+
 export class HUD {
   /**
    * @param {Phaser.Scene} scene
@@ -66,6 +83,14 @@ export class HUD {
       align: "center",
       lineSpacing: 4,
     }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(1001);
+
+    // Bottom-left: elemental affinity progression (one row per element).
+    this.affinityText = scene.add.text(MARGIN, GAME.HEIGHT - 132, "", {
+      ...base,
+      fontSize: "14px",
+      color: "#c3c8d4",
+      lineSpacing: 4,
+    }).setOrigin(0, 0).setScrollFactor(0).setDepth(1001);
 
     // Debug block (hidden until F1 toggles debug mode)
     this.debugText = scene.add.text(MARGIN, 100, "", {
@@ -119,6 +144,9 @@ export class HUD {
     // --- Top-center: owned spells ---
     this.spellsText.setText(this.formatSpells(s.spells));
 
+    // --- Bottom-left: elemental affinity ---
+    this.affinityText.setText(this.formatAffinities(s.affinities));
+
     // --- Debug block (F1) ---
     this.debugText.setVisible(!!s.debug);
     if (s.debug) {
@@ -142,6 +170,19 @@ export class HUD {
       .join("\n");
   }
 
+  /** Render the elemental affinity list (e.g. 🔥 Fire Lv12 / 💧 Water Locked). */
+  formatAffinities(affinities) {
+    if (!affinities || affinities.length === 0) return "";
+    return affinities
+      .map((a) => {
+        const emoji = AFFINITY_EMOJI[a.id] || "✨";
+        const name = AFFINITY_NAMES[a.id] || a.id;
+        const status = a.unlocked ? `Lv${a.level}` : "Locked";
+        return `${emoji} ${name} ${status}`;
+      })
+      .join("\n");
+  }
+
   /** Render the F1 debug block including the current spell build. */
   formatDebug(s) {
     const spells = (s.spells || [])
@@ -154,6 +195,13 @@ export class HUD {
       ? s.upgradeStacks.join(", ")
       : "none";
     const enemyScale = s.enemyScale != null ? s.enemyScale.toFixed(2) : "1.00";
+    const aff = (s.affinities || [])
+      .map((a) => {
+        const name = AFFINITY_NAMES[a.id] || a.id;
+        if (a.id === "spirit") return `  ${name}: ${a.locked ? "LOCKED" : a.unlocked ? `Lv${a.level}` : "hidden"}`;
+        return `  ${name}: Lv${a.level}`;
+      })
+      .join("\n");
     return (
       `FPS ${s.fps}\n` +
       `ENTITY ${s.entityCount}\n` +
@@ -166,11 +214,12 @@ export class HUD {
       `PLAYER HP ${Math.ceil(s.playerHp)} / ${s.maxHp}\n` +
       `VEL ${s.velX}, ${s.velY}\n` +
       `COLLISION ${s.colliding ? "INVULN" : "clear"}\n` +
-      `LVL ${s.level}\n` +
+      `CHAR LVL ${s.level}\n` +
       `EXP ${s.exp} / ${s.expRequired}\n` +
       `POS ${Math.round(s.playerX)}, ${Math.round(s.playerY)}\n` +
       `SPELL MULTS\n${mults}\n` +
       `SPELLS\n${spells}\n` +
+      `AFFINITY\n${aff}\n` +
       `UPGRADE STACKS ${upgrades}`
     );
   }

@@ -1,40 +1,55 @@
 {
-  "version": 1,
+  "version": 2,
   "elements": {
     "fire": {
       "name": "Fire",
       "description": "A destructive elemental force focused on damage and burning",
       "color": "#ff5a2c",
       "statusEffects": ["burn"],
-      "locked": false
+      "unlocked": true,
+      "hidden": false,
+      "locked": false,
+      "affinityUnlock": null
     },
     "water": {
       "name": "Water",
       "description": "A chilling elemental force focused on control and slowing",
       "color": "#3aa0ff",
       "statusEffects": ["chill"],
-      "locked": false
+      "unlocked": false,
+      "hidden": false,
+      "locked": false,
+      "affinityUnlock": { "element": "fire", "level": 15 }
     },
     "air": {
       "name": "Air",
       "description": "A swift elemental force focused on piercing and knockback",
       "color": "#9fe8ff",
       "statusEffects": ["knockback"],
-      "locked": false
+      "unlocked": false,
+      "hidden": false,
+      "locked": false,
+      "affinityUnlock": { "element": "fire", "level": 25 }
     },
     "earth": {
       "name": "Earth",
       "description": "A heavy elemental force focused on impact and grounding",
       "color": "#9c7a4d",
       "statusEffects": [],
-      "locked": false
+      "unlocked": false,
+      "hidden": false,
+      "locked": false,
+      "affinityUnlock": { "element": "fire", "level": 35 }
     },
     "spirit": {
       "name": "Spirit",
       "description": "An ethereal arcane force, sealed away and not yet available",
       "color": "#b06bff",
       "statusEffects": [],
-      "locked": true
+      "unlocked": false,
+      "hidden": true,
+      "locked": true,
+      "affinityUnlock": null
     }
   }
 }

@@ -34,6 +34,7 @@ import { LevelSystem } from "../systems/LevelSystem.js";
 import { DamageSystem } from "../systems/DamageSystem.js";
 import { MagicSystem } from "../systems/MagicSystem.js";
 import { UpgradeSystem } from "../systems/UpgradeSystem.js";
+import { AffinitySystem } from "../systems/AffinitySystem.js";
 import { HUD } from "../ui/HUD.js";
 import { LevelUpUI } from "../ui/LevelUpUI.js";
 
@@ -154,6 +155,9 @@ export class GameScene extends Phaser.Scene {
     // --- Spell progression (level-up upgrades) ---
     this.upgradeSystem = new UpgradeSystem(this, data, this.magicSystem);
 
+    // --- Elemental progression (affinity) ---
+    this.affinitySystem = new AffinitySystem(this, data);
+
     // --- UI ---
     this.hud = new HUD(this);
     this.levelUpUI = new LevelUpUI(this);
@@ -173,6 +177,7 @@ export class GameScene extends Phaser.Scene {
     this.game.events.on(EVENTS.PLAYER_DIED, this.onPlayerDied, this);
     this.game.events.on(EVENTS.ENTITY_DIED, this.onEntityDied, this);
     this.game.events.on(EVENTS.DAMAGE_DEALT, this.onDamageDealt, this);
+    this.game.events.on(EVENTS.AFFINITY_LEVELED, this.onAffinityLeveled, this);
     this.events.once("shutdown", this.onShutdown, this);
   }
 
@@ -226,6 +231,15 @@ export class GameScene extends Phaser.Scene {
         dmgMult: m.damageMult,
         cdMult: m.cooldownMult,
         sizeMult: m.sizeMult,
+      })),
+      // Elemental progression (affinity) for the HUD list + debug
+      affinities: this.affinitySystem.list().map((e) => ({
+        id: e.id,
+        level: e.level,
+        maxLevel: e.maxLevel,
+        unlocked: e.unlocked,
+        locked: e.locked,
+        hidden: e.hidden,
       })),
     });
 
@@ -325,22 +339,30 @@ export class GameScene extends Phaser.Scene {
     if (projectile.hasHit(enemy)) return; // returning shots strike each enemy once
     projectile.markHit(enemy);
 
+    // Affinity bonus: Fire Lv10+ adds a damage multiplier to that element.
+    const affMult = this.affinitySystem.getDamageMultiplier(projectile.element);
+    const dmg = Math.max(1, Math.round(projectile.damage * affMult));
+
     const color = this.elementColors[projectile.element] ?? 0xffffff;
-    this.damageSystem.applyDamage(enemy, projectile.damage, {
+    this.damageSystem.applyDamage(enemy, dmg, {
       type: "element",
       element: projectile.element,
       source: projectile,
     });
     this.spawnHitEffect(enemy.x, enemy.y, color);
 
-    // Burn Chance upgrade: chance to apply a burn damage-over-time.
-    if (projectile.burnChance > 0 && Math.random() < projectile.burnChance) {
+    // Burn: from the Burn Chance upgrade OR the Fire Lv20 affinity milestone.
+    const burnChance = Math.max(
+      projectile.burnChance,
+      this.affinitySystem.getBurnChance(projectile.element)
+    );
+    if (burnChance > 0 && Math.random() < burnChance) {
       this.applyBurn(enemy, projectile.element);
     }
 
     // Inferno Shot upgrade: detonate, damaging everything nearby.
     if (projectile.explode) {
-      this.explodeAt(enemy.x, enemy.y, projectile);
+      this.explodeAt(enemy.x, enemy.y, projectile, affMult);
       projectile.despawn();
       return;
     }
@@ -370,10 +392,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** AoE detonation for the Inferno Shot upgrade. */
-  explodeAt(x, y, projectile) {
+  explodeAt(x, y, projectile, affMult = 1) {
     const radius = 90;
     const color = this.elementColors[projectile.element] ?? 0xffffff;
-    const splash = Math.round(projectile.damage * 0.6);
+    const splash = Math.max(1, Math.round(projectile.damage * 0.6 * affMult));
     const children = this.enemies.getChildren();
     for (let i = 0; i < children.length; i++) {
       const e = children[i];
@@ -445,11 +467,17 @@ export class GameScene extends Phaser.Scene {
   /**
    * Any entity died (emitted by DamageSystem). The player's death is handled
    * separately via PLAYER_DIED; here we award EXP + spawn a death effect for
-   * enemies.
+   * enemies. Elemental kills also grant AFFINITY EXP to that element (a fraction
+   * of the enemy's EXP reward) — separate from character progression.
    */
-  onEntityDied(entity) {
+  onEntityDied(entity, source) {
     if (entity === this.player) return; // player death -> GameOver
-    this.levelSystem.gainExp(entity.experienceReward || 0);
+    const reward = entity.experienceReward || 0;
+    this.levelSystem.gainExp(reward);
+    // Affinity EXP: half the enemy's EXP, attributed to the killing element.
+    if (source && source.element && this.affinitySystem.elements[source.element]) {
+      this.affinitySystem.grantExp(source.element, Math.ceil(reward / 2));
+    }
     this.spawnDeathEffect(entity.x, entity.y);
   }
 
@@ -473,9 +501,28 @@ export class GameScene extends Phaser.Scene {
     this.physics.world.pause(); // freeze all bodies
     this.save.patchSection("player", { level });
 
-    // Roll rarity-weighted upgrade choices and show them. Selecting one applies
-    // it immediately (raising that spell's level) and resumes the run.
-    const choices = this.upgradeSystem.rollChoices(3).map((u) => ({
+    // Roll level-up choices. Categories are prepared (see below) but only the
+    // spell-upgrade category is active this version; the structure already
+    // supports future "unlock element" / "increase affinity" choices.
+    const choices = this.rollLevelUpChoices();
+
+    this.levelUpUI.show(level, choices, (choice) => {
+      this.applyLevelUpChoice(choice);
+      this.onLevelUpContinue();
+    });
+  }
+
+  /**
+   * Build the level-up choice list. Each choice carries a `category` so the UI
+   * and apply logic can branch later. Currently only `spell` choices exist.
+   *
+   * Future (prepared, not implemented):
+   *   - category "affinity": raise an element's affinity level
+   *   - category "unlock":   unlock a locked element via unlockElement()
+   */
+  rollLevelUpChoices() {
+    const spellChoices = this.upgradeSystem.rollChoices(3).map((u) => ({
+      category: "spell",
       upgrade: u,
       name: u.name,
       rarity: u.rarity,
@@ -487,10 +534,30 @@ export class GameScene extends Phaser.Scene {
       desc: this.upgradeSystem.describe(u, this.upgradeSystem.getStacks(u.id)),
     }));
 
-    this.levelUpUI.show(level, choices, (choice) => {
-      if (choice && choice.upgrade) this.upgradeSystem.applyUpgrade(choice.upgrade);
-      this.onLevelUpContinue();
-    });
+    // Placeholder hooks for future categories (return [] until implemented).
+    const affinityChoices = this.rollAffinityChoices(); // [] for now
+    const unlockChoices = this.rollUnlockChoices(); // [] for now
+
+    return [...spellChoices, ...affinityChoices, ...unlockChoices];
+  }
+
+  /** Future: choices that raise an element's affinity. Returns [] for now. */
+  rollAffinityChoices() {
+    return [];
+  }
+
+  /** Future: choices that unlock a locked element. Returns [] for now. */
+  rollUnlockChoices() {
+    return [];
+  }
+
+  /** Apply a chosen level-up card. Branches on its category. */
+  applyLevelUpChoice(choice) {
+    if (!choice) return;
+    if (choice.category === "spell" && choice.upgrade) {
+      this.upgradeSystem.applyUpgrade(choice.upgrade);
+    }
+    // affinity / unlock categories handled here in a future version.
   }
 
   onLevelUpContinue() {
@@ -512,11 +579,35 @@ export class GameScene extends Phaser.Scene {
     this.scene.start(SCENES.GAME_OVER, { level: this.levelSystem.getLevel() });
   }
 
+  /** Brief on-screen notice when an element affinity levels up. */
+  onAffinityLeveled(id, level) {
+    const name = id.charAt(0).toUpperCase() + id.slice(1);
+    const label = `${name} Affinity Lv${level}`;
+    const t = this.add
+      .text(this.scale.width / 2, 120, label, {
+        fontFamily: "Segoe UI, sans-serif",
+        fontSize: "20px",
+        color: "#ffb347",
+        fontStyle: "bold",
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(1500);
+    this.tweens.add({
+      targets: t,
+      y: 96,
+      alpha: 0,
+      duration: 1400,
+      onComplete: () => t.destroy(),
+    });
+  }
+
   /** Clean up global listeners so restarts don't double-bind. */
   onShutdown() {
     this.game.events.off(EVENTS.LEVEL_UP, this.onLevelUp, this);
     this.game.events.off(EVENTS.PLAYER_DIED, this.onPlayerDied, this);
     this.game.events.off(EVENTS.ENTITY_DIED, this.onEntityDied, this);
     this.game.events.off(EVENTS.DAMAGE_DEALT, this.onDamageDealt, this);
+    this.game.events.off(EVENTS.AFFINITY_LEVELED, this.onAffinityLeveled, this);
   }
 }

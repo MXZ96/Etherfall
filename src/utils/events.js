@@ -27,6 +27,10 @@ export const EVENTS = {
   // Magic
   MAGIC_CASTED: "magic:casted",
 
+  // Affinity / elemental progression
+  AFFINITY_LEVELED: "affinity:leveled",
+  AFFINITY_UNLOCKED: "affinity:unlocked",
+
   // UI / Flow
   GAME_PAUSED: "flow:paused",
   GAME_RESUMED: "flow:resumed",
