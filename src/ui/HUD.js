@@ -202,6 +202,19 @@ export class HUD {
         return `  ${name}: Lv${a.level}`;
       })
       .join("\n");
+    const codex = (s.codexCategories || [])
+      .map((c) => `  ${c.cat}: ${c.discovered}/${c.total} (${Math.round(c.pct * 100)}%)`)
+      .join("\n");
+    const overall = s.codexOverall != null ? `${Math.round(s.codexOverall * 100)}%` : "0%";
+    const knownSpells = (s.codexKnownSpells || [])
+      .map((n) => `  ${n}`)
+      .join("\n") || "  none";
+    const lockedSpells = (s.codexLockedSpells || [])
+      .map((n) => `  ${n}`)
+      .join("\n") || "  none";
+    const discoveredEnemies = (s.codexDiscoveredEnemies || [])
+      .map((n) => `  ${n}`)
+      .join("\n") || "  none";
     return (
       `FPS ${s.fps}\n` +
       `ENTITY ${s.entityCount}\n` +
@@ -219,8 +232,13 @@ export class HUD {
       `POS ${Math.round(s.playerX)}, ${Math.round(s.playerY)}\n` +
       `SPELL MULTS\n${mults}\n` +
       `SPELLS\n${spells}\n` +
+      `KNOWN SPELLS\n${knownSpells}\n` +
+      `LOCKED SPELLS\n${lockedSpells}\n` +
+      `DISCOVERED ENEMIES\n${discoveredEnemies}\n` +
       `AFFINITY\n${aff}\n` +
-      `UPGRADE STACKS ${upgrades}`
+      `UPGRADE STACKS ${upgrades}\n` +
+      `CODEX\n${codex}\n` +
+      `OVERALL ${overall}`
     );
   }
 

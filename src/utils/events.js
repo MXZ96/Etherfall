@@ -38,4 +38,13 @@ export const EVENTS = {
 
   // Settings
   SETTINGS_CHANGED: "settings:changed",
+
+  // Spell Pool
+  SPELL_UNLOCKED: "spell:unlocked",
+
+  // Codex / Discovery
+  CODEX_UPDATED: "codex:updated",
+  SPELL_DISCOVERED: "codex:spell-discovered",
+  ELEMENT_DISCOVERED: "codex:element-discovered",
+  ENEMY_DISCOVERED: "codex:enemy-discovered",
 };

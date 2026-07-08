@@ -72,6 +72,7 @@ export const SCENES = {
   GAME: "GameScene",
   PAUSE: "PauseScene",
   GAME_OVER: "GameOverScene",
+  CODEX: "CodexScene",
 };
 
 export const TEXTURE_KEYS = {

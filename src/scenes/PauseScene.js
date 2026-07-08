@@ -28,10 +28,11 @@ export class PauseScene extends Phaser.Scene {
     this.settings = this.registry.get("settings");
 
     this.makeButton(cx, cy - 40, "RESUME", () => this.resumeGame());
-    this.makeButton(cx, cy + 20, "TOGGLE FULLSCREEN", () => {
+    this.makeButton(cx, cy + 20, "ARCANE CODEX", () => this.openCodex());
+    this.makeButton(cx, cy + 80, "TOGGLE FULLSCREEN", () => {
       this.settings.toggleFullscreen();
     });
-    this.makeButton(cx, cy + 80, "QUIT TO MENU", () => this.quit());
+    this.makeButton(cx, cy + 140, "QUIT TO MENU", () => this.quit());
 
     this.input.keyboard.on("keydown-ESC", () => this.resumeGame());
     this.input.keyboard.on("keydown-P", () => this.resumeGame());
@@ -55,6 +56,10 @@ export class PauseScene extends Phaser.Scene {
   resumeGame() {
     this.scene.resume(SCENES.GAME);
     this.scene.stop();
+  }
+
+  openCodex() {
+    this.scene.launch(SCENES.CODEX);
   }
 
   quit() {

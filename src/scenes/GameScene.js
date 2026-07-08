@@ -35,6 +35,9 @@ import { DamageSystem } from "../systems/DamageSystem.js";
 import { MagicSystem } from "../systems/MagicSystem.js";
 import { UpgradeSystem } from "../systems/UpgradeSystem.js";
 import { AffinitySystem } from "../systems/AffinitySystem.js";
+import { SpellPoolSystem } from "../systems/SpellPoolSystem.js";
+import { CodexSystem } from "../systems/CodexSystem.js";
+import { DiscoveryEventUI } from "../ui/DiscoveryEventUI.js";
 import { HUD } from "../ui/HUD.js";
 import { LevelUpUI } from "../ui/LevelUpUI.js";
 
@@ -155,8 +158,19 @@ export class GameScene extends Phaser.Scene {
     // --- Spell progression (level-up upgrades) ---
     this.upgradeSystem = new UpgradeSystem(this, data, this.magicSystem);
 
+    // --- Spell pool (known / hidden / locked) ---
+    this.spellPool = new SpellPoolSystem(this, data, this.magicSystem);
+    this.syncSpellPool();
+
     // --- Elemental progression (affinity) ---
     this.affinitySystem = new AffinitySystem(this, data);
+
+    // --- Codex (discovery tracker) ---
+    this.codex = new CodexSystem(this, this.save, data);
+    this.registry.set("codex", this.codex);
+
+    // --- Discovery toasts ---
+    this.discoveryUI = new DiscoveryEventUI(this);
 
     // --- UI ---
     this.hud = new HUD(this);
@@ -178,6 +192,12 @@ export class GameScene extends Phaser.Scene {
     this.game.events.on(EVENTS.ENTITY_DIED, this.onEntityDied, this);
     this.game.events.on(EVENTS.DAMAGE_DEALT, this.onDamageDealt, this);
     this.game.events.on(EVENTS.AFFINITY_LEVELED, this.onAffinityLeveled, this);
+    this.game.events.on(EVENTS.AFFINITY_UNLOCKED, this.onAffinityUnlocked, this);
+    this.game.events.on(EVENTS.MAGIC_CASTED, this.onMagicCasted, this);
+    this.game.events.on(EVENTS.SPELL_UNLOCKED, this.onSpellUnlocked, this);
+    this.game.events.on(EVENTS.SPELL_DISCOVERED, this.onSpellDiscovered, this);
+    this.game.events.on(EVENTS.ELEMENT_DISCOVERED, this.onElementDiscovered, this);
+    this.game.events.on(EVENTS.ENEMY_DISCOVERED, this.onEnemyDiscovered, this);
     this.events.once("shutdown", this.onShutdown, this);
   }
 
@@ -241,6 +261,23 @@ export class GameScene extends Phaser.Scene {
         locked: e.locked,
         hidden: e.hidden,
       })),
+      // Codex completion for debug
+      codexOverall: this.codex ? this.codex.getOverallCompletion() : 0,
+      codexCategories: this.codex
+        ? this.codex.getAvailableCategories().map((cat) => ({
+            cat,
+            discovered: this.codex.countDiscovered(cat),
+            total: this.codex.countTotal(cat),
+            pct: this.codex.getCompletion(cat),
+          }))
+        : [],
+      codexKnownSpells: this.spellPool
+        ? this.spellPool.getKnownSpellIds().map((id) => this.spellPool.get(id)?.name || id)
+        : [],
+      codexLockedSpells: this.spellPool
+        ? this.spellPool.list().filter((e) => e.status === "locked").map((e) => e.name)
+        : [],
+      codexDiscoveredEnemies: this.codex ? this.codex.getDiscovered("enemies") : [],
     });
 
     // While a level-up overlay is open the world is frozen.
@@ -478,6 +515,10 @@ export class GameScene extends Phaser.Scene {
     if (source && source.element && this.affinitySystem.elements[source.element]) {
       this.affinitySystem.grantExp(source.element, Math.ceil(reward / 2));
     }
+    // Codex: discover enemy on first kill.
+    if (this.codex && entity.def && entity.def.name) {
+      this.codex.discover("enemies", entity.def.name);
+    }
     this.spawnDeathEffect(entity.x, entity.y);
   }
 
@@ -602,6 +643,58 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  // ------------------------------------------------------------------------
+  // Spell Pool
+  // ------------------------------------------------------------------------
+  syncSpellPool() {
+    const known = this.spellPool.getKnownSpellIds();
+    this.magicSystem.magics.forEach((m) => {
+      m.owned = known.includes(m.id) && !m.locked;
+    });
+    this.magicSystem.ownedMagics = this.magicSystem.magics.filter((m) => m.owned);
+    if (this.magicSystem.ownedMagics.length === 0 && this.magicSystem.magics.length > 0) {
+      this.magicSystem.activeIndex = 0;
+      this.magicSystem.active = this.magicSystem.magics[0];
+    }
+  }
+
+  // ------------------------------------------------------------------------
+  // Auto-discovery hooks
+  // ------------------------------------------------------------------------
+  onMagicCasted(magic) {
+    if (magic && this.codex) {
+      this.codex.discover("spells", magic.id);
+    }
+  }
+
+  onSpellUnlocked(spellId) {
+    this.syncSpellPool();
+    if (this.codex) {
+      this.codex.discover("spells", spellId);
+    }
+  }
+
+  onSpellDiscovered(spellId) {
+    const entry = this.spellPool.get(spellId);
+    const name = entry ? entry.name : spellId;
+    this.discoveryUI.show("NEW SPELL DISCOVERED", name);
+  }
+
+  onAffinityUnlocked(elementId) {
+    if (this.codex) {
+      this.codex.discover("elements", elementId);
+    }
+  }
+
+  onElementDiscovered(elementId) {
+    const name = elementId.charAt(0).toUpperCase() + elementId.slice(1);
+    this.discoveryUI.show("NEW ELEMENT DISCOVERED", name);
+  }
+
+  onEnemyDiscovered(enemyName) {
+    this.discoveryUI.show("NEW ENEMY DISCOVERED", enemyName);
+  }
+
   /** Clean up global listeners so restarts don't double-bind. */
   onShutdown() {
     this.game.events.off(EVENTS.LEVEL_UP, this.onLevelUp, this);
@@ -609,5 +702,11 @@ export class GameScene extends Phaser.Scene {
     this.game.events.off(EVENTS.ENTITY_DIED, this.onEntityDied, this);
     this.game.events.off(EVENTS.DAMAGE_DEALT, this.onDamageDealt, this);
     this.game.events.off(EVENTS.AFFINITY_LEVELED, this.onAffinityLeveled, this);
+    this.game.events.off(EVENTS.AFFINITY_UNLOCKED, this.onAffinityUnlocked, this);
+    this.game.events.off(EVENTS.MAGIC_CASTED, this.onMagicCasted, this);
+    this.game.events.off(EVENTS.SPELL_UNLOCKED, this.onSpellUnlocked, this);
+    this.game.events.off(EVENTS.SPELL_DISCOVERED, this.onSpellDiscovered, this);
+    this.game.events.off(EVENTS.ELEMENT_DISCOVERED, this.onElementDiscovered, this);
+    this.game.events.off(EVENTS.ENEMY_DISCOVERED, this.onEnemyDiscovered, this);
   }
 }
