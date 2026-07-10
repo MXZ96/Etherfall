@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "awakenings": [
+    {
+      "id": "fire",
+      "name": "Fire Awakening",
+      "element": "fire",
+      "released": true,
+      "hidden": false,
+      "requirements": {
+        "affinity": { "fire": 10 },
+        "level": 10
+      },
+      "reward": {
+        "burn": true,
+        "visualUpgrade": true,
+        "codexEntry": "Fire Awakening",
+        "baseBurnChance": 0.2
+      },
+      "color": "#ff5a2c",
+      "text": {
+        "line1": "The Flame has acknowledged your existence.",
+        "line2": "🔥 Fire Awakening"
+      },
+      "codexDescription": "The Flame has acknowledged you. Burn is now yours to command, and your fire burns brighter than before.",
+      "history": "A moment of recognition between caster and element."
+    },
+    {
+      "id": "water",
+      "name": "Water Awakening",
+      "element": "water",
+      "released": false,
+      "hidden": false,
+      "locked": true,
+      "requirements": {
+        "affinity": { "water": 10 },
+        "level": 10
+      },
+      "reward": {
+        "visualUpgrade": true,
+        "codexEntry": "Water Awakening"
+      },
+      "color": "#3aa0ff",
+      "text": {
+        "line1": "The Tide has taken notice of your path.",
+        "line2": "💧 Water Awakening"
+      },
+      "codexDescription": "Not yet awakened. Attune to Water and grow its affinity to learn what the Tide offers.",
+      "history": "Future awakening (v0.1.0)."
+    },
+    {
+      "id": "air",
+      "name": "Air Awakening",
+      "element": "air",
+      "released": false,
+      "hidden": false,
+      "locked": true,
+      "requirements": {
+        "affinity": { "air": 10 },
+        "level": 10
+      },
+      "reward": {
+        "visualUpgrade": true,
+        "codexEntry": "Air Awakening"
+      },
+      "color": "#9fe8ff",
+      "text": {
+        "line1": "The Wind has caught your intent.",
+        "line2": "🌬 Air Awakening"
+      },
+      "codexDescription": "Not yet awakened. Attune to Air and grow its affinity to learn what the Wind offers.",
+      "history": "Future awakening (v0.1.1)."
+    },
+    {
+      "id": "earth",
+      "name": "Earth Awakening",
+      "element": "earth",
+      "released": false,
+      "hidden": false,
+      "locked": true,
+      "requirements": {
+        "affinity": { "earth": 10 },
+        "level": 10
+      },
+      "reward": {
+        "visualUpgrade": true,
+        "codexEntry": "Earth Awakening"
+      },
+      "color": "#9c7a4d",
+      "text": {
+        "line1": "The Mountain has felt your roots.",
+        "line2": "⛰ Earth Awakening"
+      },
+      "codexDescription": "Not yet awakened. Attune to Earth and grow its affinity to learn what the Mountain offers.",
+      "history": "Future awakening (prepared for a later version)."
+    },
+    {
+      "id": "spirit",
+      "name": "???",
+      "element": "spirit",
+      "released": false,
+      "hidden": true,
+      "requirements": {},
+      "reward": {},
+      "color": "#b06bff"
+    }
+  ],
+  "statusEffects": {
+    "burn": { "id": "burn", "element": "fire", "tickDamage": 2, "duration": 3000 },
+    "freeze": { "id": "freeze", "element": "water", "prepared": true },
+    "shock": { "id": "shock", "element": "air", "prepared": true },
+    "poison": { "id": "poison", "element": "earth", "prepared": true },
+    "curse": { "id": "curse", "element": "spirit", "prepared": true }
+  }
+}

@@ -165,12 +165,13 @@ export class HUD {
             ? "Ready"
             : `CD ${(sp.cdMs / 1000).toFixed(1)}s`
           : "";
-        return `${emoji} ${sp.name} Lv${sp.level}  ×${sp.projectileCount}${cd ? `  (${cd})` : ""}`;
+        const mark = sp.awakened ? " ✦" : "";
+        return `${emoji} ${sp.name} Lv${sp.level}${mark}  ×${sp.projectileCount}${cd ? `  (${cd})` : ""}`;
       })
       .join("\n");
   }
 
-  /** Render the elemental affinity list (e.g. 🔥 Fire Lv12 / 💧 Water Locked). */
+  /** Render the elemental affinity list (e.g. 🔥 Fire Lv12 ✦ / 💧 Water Locked). */
   formatAffinities(affinities) {
     if (!affinities || affinities.length === 0) return "";
     return affinities
@@ -178,7 +179,8 @@ export class HUD {
         const emoji = AFFINITY_EMOJI[a.id] || "✨";
         const name = AFFINITY_NAMES[a.id] || a.id;
         const status = a.unlocked ? `Lv${a.level}` : "Locked";
-        return `${emoji} ${name} ${status}`;
+        const mark = a.awakened ? " ✦" : "";
+        return `${emoji} ${name} ${status}${mark}`;
       })
       .join("\n");
   }
@@ -215,6 +217,11 @@ export class HUD {
     const discoveredEnemies = (s.codexDiscoveredEnemies || [])
       .map((n) => `  ${n}`)
       .join("\n") || "  none";
+    const awakened = (s.awakenedElements && s.awakenedElements.length)
+      ? s.awakenedElements.join(", ")
+      : "none";
+    const burn = s.burnActive != null ? s.burnActive : 0;
+    const ready = s.awakeningReady ? "YES" : "no";
     return (
       `FPS ${s.fps}\n` +
       `ENTITY ${s.entityCount}\n` +
@@ -230,6 +237,9 @@ export class HUD {
       `CHAR LVL ${s.level}\n` +
       `EXP ${s.exp} / ${s.expRequired}\n` +
       `POS ${Math.round(s.playerX)}, ${Math.round(s.playerY)}\n` +
+      `AWAKENED ${awakened}\n` +
+      `BURN ACTIVE ${burn}\n` +
+      `AWAKEN READY ${ready}\n` +
       `SPELL MULTS\n${mults}\n` +
       `SPELLS\n${spells}\n` +
       `KNOWN SPELLS\n${knownSpells}\n` +

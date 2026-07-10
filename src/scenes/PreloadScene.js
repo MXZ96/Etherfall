@@ -23,6 +23,7 @@ const DATA_FILES = [
   "status_effect",
   "upgrades",
   "affinity",
+  "awakenings",
 ];
 
 export class PreloadScene extends Phaser.Scene {

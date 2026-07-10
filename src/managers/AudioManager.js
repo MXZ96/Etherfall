@@ -57,4 +57,30 @@ export class AudioManager {
   setMuted(muted) {
     this.muted = muted;
   }
+
+  /**
+   * Fade the music bus toward a target volume over `duration` ms. No-op until
+   * music assets exist, but the internal value is tracked so a real music
+   * implementation can honour it (used by the Fire Awakening cinematic to
+   * "slowly fade game music" then restore it).
+   * @param {number} target  volume 0..1
+   * @param {number} [duration=1000]  fade time in ms
+   */
+  fadeMusicTo(target, duration = 1000) {
+    this._musicFadeTarget = this.musicVolume;
+    this.musicVolume = this.muted ? 0 : clamp(target, 0, 1);
+    // TODO: drive this.game.sound.getMusicVolume() tween once music assets exist.
+    void duration;
+  }
+
+  /**
+   * Play an element's awakening fanfare on a dedicated "awakening" channel.
+   * No-op until audio assets are added; the per-element sound key is prepared
+   * so Fire/Water/Air/Earth/Spirit each get their own cue later.
+   * @param {string} elementId  fire | water | air | earth | spirit
+   */
+  playAwakening(elementId) {
+    // TODO: implement with a dedicated awakening bus once SFX assets exist.
+    void elementId;
+  }
 }

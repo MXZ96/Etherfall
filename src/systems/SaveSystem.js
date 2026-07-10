@@ -33,6 +33,15 @@ function defaultSave() {
       discoveredSpells: [],
       achievements: [],
     },
+    // Elemental Awakening (v0.0.8): prepared section. Holds which elements have
+    // permanently awakened, their levels, and an unlock history (with timestamps
+    // for future "date unlocked" codex support). Not a full save system — just
+    // the shape needed so awakening state survives reloads without migration.
+    awakenings: {
+      awakened: {},
+      levels: {},
+      history: [],
+    },
   };
 }
 
@@ -70,6 +79,7 @@ export class SaveSystem {
       player: { ...base.player, ...(parsed.player || {}) },
       settings: { ...base.settings, ...(parsed.settings || {}) },
       progress: { ...base.progress, ...(parsed.progress || {}) },
+      awakenings: { ...base.awakenings, ...(parsed.awakenings || {}) },
     };
   }
 

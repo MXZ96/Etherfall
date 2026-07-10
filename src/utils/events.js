@@ -31,6 +31,9 @@ export const EVENTS = {
   AFFINITY_LEVELED: "affinity:leveled",
   AFFINITY_UNLOCKED: "affinity:unlocked",
 
+  // Elemental Awakening (v0.0.8)
+  AWAKENING_STARTED: "awakening:started",
+
   // UI / Flow
   GAME_PAUSED: "flow:paused",
   GAME_RESUMED: "flow:resumed",

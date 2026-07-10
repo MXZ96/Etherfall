@@ -24,6 +24,7 @@ const CATEGORY_META = {
   elements: { label: "Elements", icon: "🔥" },
   spells: { label: "Magic", icon: "✨" },
   enemies: { label: "Enemies", icon: "💀" },
+  awakenings: { label: "Awakenings", icon: "✦" },
   artifacts: { label: "Artifacts", icon: "📜" },
   fusions: { label: "Fusion", icon: "🔮" },
   achievements: { label: "Achievements", icon: "🏆" },
@@ -213,10 +214,11 @@ export class CodexUI {
 
         this.entries.push({ bg, title: titleText, desc: descText, detail: detailText });
       } else {
-        const lock = this.scene.add.text(cx, y, "???", {
+        const locked = def.locked;
+        const lock = this.scene.add.text(cx, y, locked ? "LOCKED" : "???", {
           fontFamily: "Segoe UI, sans-serif",
           fontSize: "16px",
-          color: "#6b6f7a",
+          color: locked ? "#5a5f6e" : "#6b6f7a",
           fontStyle: "bold",
           align: "center",
         }).setOrigin(0.5).setScrollFactor(0).setDepth(2103);
@@ -240,7 +242,7 @@ export class CodexUI {
   }
 
   getDescription(def) {
-    const raw = def.description || def.lore || "";
+    const raw = def.description || def.codexDescription || def.lore || "";
     const maxChars = 38;
     const words = raw.split(" ");
     const lines = [];

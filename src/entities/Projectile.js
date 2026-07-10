@@ -65,6 +65,10 @@ export class Projectile extends LivingEntity {
     this.setTint(color);
     this.setBlendMode(Phaser.BlendModes.ADD); // glow
     this.setActive(true).setVisible(true);
+
+    // Subtle visual upgrade once Fire has Awakened (brighter, slightly larger).
+    this.awakened = !!(this.scene.awakenedFire && this.element === "fire");
+    if (this.awakened) this.setScale(1.18);
   }
 
   /**
@@ -125,9 +129,12 @@ export class Projectile extends LivingEntity {
     }
   }
 
-  /** Cheap fading glow puff behind the projectile. */
+  /** Cheap fading glow puff behind the projectile (brighter once Fire Awakens). */
   spawnTrail() {
-    const puff = this.scene.add.circle(this.x, this.y, this.size * 0.7, this.color, 0.5)
+    const brighter = this.scene.awakenedFire && this.element === "fire";
+    const size = brighter ? this.size * 0.95 : this.size * 0.7;
+    const alpha = brighter ? 0.85 : 0.5;
+    const puff = this.scene.add.circle(this.x, this.y, size, this.color, alpha)
       .setDepth(5)
       .setBlendMode(Phaser.BlendModes.ADD);
     this.scene.tweens.add({

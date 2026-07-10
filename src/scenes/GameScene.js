@@ -17,6 +17,7 @@
 
 import * as Phaser from "phaser";
 import {
+  GAME,
   CAMERA,
   SCENES,
   WORLD,
@@ -37,6 +38,7 @@ import { UpgradeSystem } from "../systems/UpgradeSystem.js";
 import { AffinitySystem } from "../systems/AffinitySystem.js";
 import { SpellPoolSystem } from "../systems/SpellPoolSystem.js";
 import { CodexSystem } from "../systems/CodexSystem.js";
+import { AwakeningSystem } from "../systems/AwakeningSystem.js";
 import { DiscoveryEventUI } from "../ui/DiscoveryEventUI.js";
 import { HUD } from "../ui/HUD.js";
 import { LevelUpUI } from "../ui/LevelUpUI.js";
@@ -165,6 +167,21 @@ export class GameScene extends Phaser.Scene {
     // --- Elemental progression (affinity) ---
     this.affinitySystem = new AffinitySystem(this, data);
 
+    // --- Elemental Awakening (v0.0.8) ---
+    this.awakeningSystem = new AwakeningSystem(
+      this,
+      data,
+      this.save,
+      this.affinitySystem,
+      this.levelSystem
+    );
+    // Reflect any previously-awakened Fire from a prior session (save support).
+    this.awakenedFire = this.awakeningSystem.isAwakened("fire");
+    if (this.awakenedFire) {
+      const fb = this.magicSystem.getMagicById("fireball");
+      if (fb) fb.awakened = true;
+    }
+
     // --- Codex (discovery tracker) ---
     this.codex = new CodexSystem(this, this.save, data);
     this.registry.set("codex", this.codex);
@@ -183,8 +200,25 @@ export class GameScene extends Phaser.Scene {
 
     // --- State flags ---
     this.leveling = false; // a level-up overlay is open
+    this.awakening = false; // an awakening cinematic is playing
     this.runTime = 0; // ms of active play
     this.damageEvents = 0; // debug counter
+
+    // --- Burn particle emitter (shared, self-cleaning) ---
+    // Small upward flame puffs emitted on burning enemies. Created once and
+    // reused; never leaks because it is a single persistent emitter.
+    this.burnEmitter = this.add
+      .particles(0, 0, TEXTURE_KEYS.PROJECTILE, {
+        speed: { min: 12, max: 38 },
+        angle: { min: 250, max: 290 },
+        scale: { start: 0.35, end: 0 },
+        alpha: { start: 0.85, end: 0 },
+        lifespan: 480,
+        blendMode: "ADD",
+        tint: this.elementColors.fire ?? 0xff5a2c,
+        emitting: false,
+      })
+      .setDepth(7);
 
     // --- Event wiring ---
     this.game.events.on(EVENTS.LEVEL_UP, this.onLevelUp, this);
@@ -198,6 +232,7 @@ export class GameScene extends Phaser.Scene {
     this.game.events.on(EVENTS.SPELL_DISCOVERED, this.onSpellDiscovered, this);
     this.game.events.on(EVENTS.ELEMENT_DISCOVERED, this.onElementDiscovered, this);
     this.game.events.on(EVENTS.ENEMY_DISCOVERED, this.onEnemyDiscovered, this);
+    this.game.events.on(EVENTS.AWAKENING_STARTED, this.onAwakeningStarted, this);
     this.events.once("shutdown", this.onShutdown, this);
   }
 
@@ -241,6 +276,7 @@ export class GameScene extends Phaser.Scene {
         active: m === this.magicSystem.active,
         ready: m === this.magicSystem.active ? this.magicSystem.isReady : true,
         cdMs: m === this.magicSystem.active ? this.magicSystem.cooldownRemaining : 0,
+        awakened: this.awakeningSystem.isAwakened(m.element),
       })),
       // Debug-only build info
       activeUpgrades: this.upgradeSystem.getActiveUpgrades().map((u) => u.name),
@@ -260,6 +296,7 @@ export class GameScene extends Phaser.Scene {
         unlocked: e.unlocked,
         locked: e.locked,
         hidden: e.hidden,
+        awakened: this.awakeningSystem.isAwakened(e.id),
       })),
       // Codex completion for debug
       codexOverall: this.codex ? this.codex.getOverallCompletion() : 0,
@@ -278,10 +315,14 @@ export class GameScene extends Phaser.Scene {
         ? this.spellPool.list().filter((e) => e.status === "locked").map((e) => e.name)
         : [],
       codexDiscoveredEnemies: this.codex ? this.codex.getDiscovered("enemies") : [],
+      // Elemental Awakening (v0.0.8) — HUD badges + debug
+      awakenedElements: this.awakeningSystem.getAwakenedElements(),
+      awakeningReady: this.awakeningSystem.canTrigger("fire"),
+      burnActive: this.countBurningEnemies(),
     });
 
-    // While a level-up overlay is open the world is frozen.
-    if (this.leveling) return;
+    // While a level-up overlay or awakening cinematic is open, the world freezes.
+    if (this.leveling || this.awakening) return;
 
     // Pause toggle.
     if (this.inputMgr.isPauseJustDown()) {
@@ -306,7 +347,8 @@ export class GameScene extends Phaser.Scene {
       const e = children[i];
       if (!e.active) continue;
       e.tick();
-      // Burn status (Damage-over-Time) ticking.
+      // Burn status (Damage-over-Time) ticking. Emits a small flame puff each
+      // tick for unique, readable burn feedback.
       if (e.burn && now < e.burn.until) {
         if (now >= e.burn.nextTick) {
           e.burn.nextTick = now + 500;
@@ -315,6 +357,7 @@ export class GameScene extends Phaser.Scene {
             element: e.burn.element,
             source: null,
           });
+          if (this.burnEmitter) this.burnEmitter.emitParticleAt(e.x, e.y, 2);
         }
       } else if (e.burn) {
         e.burn = null;
@@ -386,13 +429,16 @@ export class GameScene extends Phaser.Scene {
       element: projectile.element,
       source: projectile,
     });
-    this.spawnHitEffect(enemy.x, enemy.y, color);
+    this.spawnHitEffect(enemy.x, enemy.y, color, this.isFireAwakened(projectile));
 
-    // Burn: from the Burn Chance upgrade OR the Fire Lv20 affinity milestone.
-    const burnChance = Math.max(
-      projectile.burnChance,
-      this.affinitySystem.getBurnChance(projectile.element)
-    );
+    // Burn: unlocked by the Fire Awakening (plus a bonus from the Burn Chance
+    // upgrade and the Fire Lv20 affinity milestone). Gated on awakening so Burn
+    // is a meaningful reward rather than an early passive.
+    let burnChance = projectile.burnChance;
+    if (this.awakeningSystem.isAwakened("fire") && projectile.element === "fire") {
+      burnChance = Math.max(burnChance, this.awakeningSystem.getBaseBurnChance("fire"));
+      burnChance = Math.max(burnChance, this.affinitySystem.getBurnChance("fire"));
+    }
     if (burnChance > 0 && Math.random() < burnChance) {
       this.applyBurn(enemy, projectile.element);
     }
@@ -486,19 +532,25 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  /** Small additive burst where a projectile connects. */
-  spawnHitEffect(x, y, color) {
+  /** Small additive burst where a projectile connects. `boost` = awakened Fire. */
+  spawnHitEffect(x, y, color, boost = false) {
+    const r = boost ? 17 : 12;
     const burst = this.add
-      .circle(x, y, 12, color, 0.8)
+      .circle(x, y, r, color, boost ? 1 : 0.8)
       .setDepth(6)
       .setBlendMode(Phaser.BlendModes.ADD);
     this.tweens.add({
       targets: burst,
       scale: 0,
       alpha: 0,
-      duration: 200,
+      duration: boost ? 260 : 200,
       onComplete: () => burst.destroy(),
     });
+  }
+
+  /** True when a fire projectile is enhanced by the Fire Awakening. */
+  isFireAwakened(projectile) {
+    return !!projectile && projectile.element === "fire" && this.awakenedFire;
   }
 
   /**
@@ -605,6 +657,7 @@ export class GameScene extends Phaser.Scene {
     this.leveling = false;
     this.physics.world.resume();
     this.enemyManager.setLevel(this.levelSystem.getLevel());
+    this.maybeTriggerAwakening();
   }
 
   // ------------------------------------------------------------------------
@@ -641,6 +694,8 @@ export class GameScene extends Phaser.Scene {
       duration: 1400,
       onComplete: () => t.destroy(),
     });
+
+    this.maybeTriggerAwakening();
   }
 
   // ------------------------------------------------------------------------
@@ -695,6 +750,224 @@ export class GameScene extends Phaser.Scene {
     this.discoveryUI.show("NEW ENEMY DISCOVERED", enemyName);
   }
 
+  // ------------------------------------------------------------------------
+  // Elemental Awakening (v0.0.8)
+  // ------------------------------------------------------------------------
+
+  /**
+   * If an awakening is ready (and gameplay isn't already frozen), trigger it.
+   * Idempotent: the AwakeningSystem only allows each element to awaken once.
+   */
+  maybeTriggerAwakening() {
+    if (this.leveling || this.awakening) return;
+    const id = this.awakeningSystem.firstReady();
+    if (id) this.awakeningSystem.awaken(id);
+  }
+
+  /**
+   * Handler for EVENTS.AWAKENING_STARTED. Plays the short cinematic (~3.5s):
+   * freeze, fade music, desaturate, magic circle, embers, zoom, shake, sound,
+   * cinematic text — then smoothly returns to gameplay and applies rewards.
+   * @param {string} id
+   * @param {object} def  awakening definition from data/awakenings.json
+   */
+  onAwakeningStarted(id, def) {
+    if (this.awakening) return;
+    this.awakening = true;
+    this.physics.world.pause(); // freeze gameplay for the sequence
+
+    const cam = this.cameras.main;
+    const color = Phaser.Display.Color.HexStringToColor(def.color || "#ffffff").color;
+
+    // Slowly fade game music (prepared channel; no-op until audio assets).
+    this.audio.fadeMusicTo(0.15, 1000);
+
+    // Reduce world saturation slightly with a subtle desaturating overlay.
+    this.awakenOverlay = this.add
+      .rectangle(0, 0, GAME.WIDTH, GAME.HEIGHT, 0x0c0f14, 0)
+      .setOrigin(0)
+      .setScrollFactor(0)
+      .setDepth(1800);
+    this.tweens.add({ targets: this.awakenOverlay, alpha: 0.18, duration: 1200 });
+
+    // Slight camera zoom + small shake.
+    cam.zoomTo(1.12, 1200, "Sine.easeInOut");
+    cam.shake(420, 0.0035);
+
+    // Glowing magic circle under the player + ember particles.
+    this.spawnMagicCircle(this.player.x, this.player.y, color);
+    this.spawnAwakenEmbers(this.player.x, this.player.y, color);
+
+    // Play the awakening sound on its dedicated channel.
+    this.audio.playAwakening(id);
+
+    // Cinematic text appears ~1s in (after the brief freeze).
+    this.time.delayedCall(1000, () => this.showAwakeningText(def));
+
+    // Return to gameplay after ~3.5s.
+    this.time.delayedCall(3500, () => this.finishAwakening(id, def));
+  }
+
+  /** Apply the permanent, mostly-visual awakening rewards. */
+  applyAwakeningRewards(id, def) {
+    if (id === "fire") {
+      this.awakenedFire = true;
+      const fb = this.magicSystem.getMagicById("fireball");
+      if (fb) fb.awakened = true;
+    }
+    // Unlock the codex entry for this awakening (e.g. "Fire Awakening").
+    if (def.reward && def.reward.codexEntry && this.codex) {
+      this.codex.discover("awakenings", id);
+    }
+    // Unlock notification toast.
+    const name = def.name || id.charAt(0).toUpperCase() + id.slice(1);
+    this.discoveryUI.show("ELEMENT AWAKENED", def.text ? def.text.line2 : name);
+  }
+
+  /** Smoothly restore gameplay after the cinematic. */
+  finishAwakening(id, def) {
+    if (this.awakenOverlay) {
+      this.tweens.add({
+        targets: this.awakenOverlay,
+        alpha: 0,
+        duration: 600,
+        onComplete: () => {
+          this.awakenOverlay.destroy();
+          this.awakenOverlay = null;
+        },
+      });
+    }
+    this.cameras.main.zoomTo(1, 700, "Sine.easeInOut");
+    this.audio.fadeMusicTo(0.6, 1000); // restore music volume
+
+    this.applyAwakeningRewards(id, def);
+
+    // Resume the world just after the zoom settles back in.
+    this.time.delayedCall(800, () => {
+      if (!this.leveling) this.physics.world.resume();
+      this.awakening = false;
+    });
+  }
+
+  /** Glowing magic circle that scales in beneath the player. */
+  spawnMagicCircle(x, y, color) {
+    const ring = this.add
+      .circle(x, y, 8, 0x000000, 0)
+      .setStrokeStyle(4, color)
+      .setDepth(8)
+      .setBlendMode(Phaser.BlendModes.ADD);
+    const ring2 = this.add
+      .circle(x, y, 5, 0x000000, 0)
+      .setStrokeStyle(2, color)
+      .setDepth(8)
+      .setBlendMode(Phaser.BlendModes.ADD);
+    const fill = this.add
+      .circle(x, y, 4, color, 0.22)
+      .setDepth(7)
+      .setBlendMode(Phaser.BlendModes.ADD);
+
+    this.tweens.add({ targets: [ring, ring2], scale: 8, duration: 1400, ease: "Sine.easeOut" });
+    this.tweens.add({ targets: fill, scale: 9, alpha: 0.5, duration: 1400 });
+    this.tweens.add({ targets: ring2, angle: 360, duration: 3200, repeat: -1 });
+
+    // Self-cleaning: remove the circle shortly after the cinematic ends.
+    this.time.delayedCall(4200, () => {
+      ring.destroy();
+      ring2.destroy();
+      fill.destroy();
+    });
+  }
+
+  /** Embers rising around the player for the duration of the cinematic. */
+  spawnAwakenEmbers(x, y, color) {
+    if (!this.emberEmitter) {
+      this.emberEmitter = this.add
+        .particles(0, 0, TEXTURE_KEYS.PROJECTILE, {
+          speed: { min: 20, max: 70 },
+          angle: { min: 0, max: 360 },
+          scale: { start: 0.5, end: 0 },
+          alpha: { start: 0.9, end: 0 },
+          lifespan: 900,
+          blendMode: "ADD",
+          tint: color,
+          emitting: false,
+        })
+        .setDepth(9);
+    }
+    this.emberTimer = this.time.addEvent({
+      delay: 55,
+      repeat: 50,
+      callback: () => {
+        this.emberEmitter.emitParticleAt(
+          x + Phaser.Math.Between(-22, 22),
+          y + Phaser.Math.Between(-22, 22)
+        );
+      },
+    });
+    this.time.delayedCall(3600, () => {
+      if (this.emberTimer) {
+        this.emberTimer.remove(false);
+        this.emberTimer = null;
+      }
+      this.emberEmitter.stop();
+      this.emberEmitter.destroy();
+      this.emberEmitter = null;
+    });
+  }
+
+  /** Centered cinematic text: line1 (flavor) + line2 (element awakening). */
+  showAwakeningText(def) {
+    const text = def.text || { line1: "", line2: "" };
+    const l1 = this.add
+      .text(this.scale.width / 2, this.scale.height / 2 - 26, text.line1, {
+        fontFamily: "Segoe UI, sans-serif",
+        fontSize: "20px",
+        color: "#e6e8ef",
+        fontStyle: "italic",
+        align: "center",
+        wordWrap: { width: 760 },
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(1900)
+      .setAlpha(0);
+    const l2 = this.add
+      .text(this.scale.width / 2, this.scale.height / 2 + 14, text.line2, {
+        fontFamily: "Segoe UI, sans-serif",
+        fontSize: "30px",
+        color: def.color || "#ff5a2c",
+        fontStyle: "bold",
+        align: "center",
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(1900)
+      .setAlpha(0);
+
+    this.tweens.add({ targets: [l1, l2], alpha: 1, duration: 500, ease: "Power2" });
+    this.tweens.add({
+      targets: [l1, l2],
+      alpha: 0,
+      delay: 2200,
+      duration: 600,
+      onComplete: () => {
+        l1.destroy();
+        l2.destroy();
+      },
+    });
+  }
+
+  /** Count of enemies currently burning (for the debug overlay). */
+  countBurningEnemies() {
+    let n = 0;
+    const children = this.enemies.getChildren();
+    for (let i = 0; i < children.length; i++) {
+      const e = children[i];
+      if (e.active && e.burn && this.time.now < e.burn.until) n += 1;
+    }
+    return n;
+  }
+
   /** Clean up global listeners so restarts don't double-bind. */
   onShutdown() {
     this.game.events.off(EVENTS.LEVEL_UP, this.onLevelUp, this);
@@ -708,5 +981,6 @@ export class GameScene extends Phaser.Scene {
     this.game.events.off(EVENTS.SPELL_DISCOVERED, this.onSpellDiscovered, this);
     this.game.events.off(EVENTS.ELEMENT_DISCOVERED, this.onElementDiscovered, this);
     this.game.events.off(EVENTS.ENEMY_DISCOVERED, this.onEnemyDiscovered, this);
+    this.game.events.off(EVENTS.AWAKENING_STARTED, this.onAwakeningStarted, this);
   }
 }

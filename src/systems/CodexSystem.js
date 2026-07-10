@@ -16,6 +16,7 @@ const CODEX_CATEGORIES = [
   "elements",
   "spells",
   "enemies",
+  "awakenings",
   "fusions",
   "achievements",
   "artifacts",
@@ -62,6 +63,12 @@ export class CodexSystem {
     }
     if (data.boss && data.boss.bosses) {
       this.catalogue.bosses = data.boss.bosses;
+    }
+    if (data.awakenings && data.awakenings.awakenings) {
+      // Spirit is a hidden placeholder — never reveal it in the codex.
+      this.catalogue.awakenings = data.awakenings.awakenings.filter(
+        (a) => !a.hidden
+      );
     }
 
     // Auto-discover starter element / spells on first run.

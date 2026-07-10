@@ -1,8 +1,8 @@
 # Etherfall
 
 A browser **Bullet-Heaven Roguelite** (top-down action RPG) built with **Phaser 3**
-and **vanilla ES Modules**. This repository is **version 0.0.6** — the Affinity
-System & Elemental Progression Foundation. The player AUTO-CASTS Fireball at
+and **vanilla ES Modules**. This repository is **version 0.0.8** — Elemental
+Awakening. The player AUTO-CASTS Fireball at
 the nearest enemy; on level-up the game pauses and offers three rarity-weighted
 spell upgrades. Separately from character EXP, killing enemies with an element's
 magic grants **Affinity EXP** to that element (Fire starts unlocked; Water/Air/
@@ -11,7 +11,7 @@ pays off: **Lv10 +10% Fire damage**, **Lv20 base Burn chance**, with Lv30/40/50
 milestones reserved for future effects. Progression is bounded by per-spell
 `limits`, per-upgrade `maxStacks`, diminishing returns, and an intentionally
 slow affinity curve (Lv50 is a long-term achievement).
-loadouts; Spirit stays locked. Affinity and fusion are still future.
+Spirit stays hidden. Affinity and fusion are still future.
 
 ## Running locally
 
@@ -106,12 +106,26 @@ etherfall/
      appears only when a valid save exists (`SaveSystem.hasSave()`). The save
      document already reserves `progress` (highestLevel, unlockedElements,
      discoveredSpells, achievements) for a future full save system.
-  9. **PauseScene** (Esc/P) overlays resume / fullscreen / quit options.
-     Press **F1** for the debug overlay (character level, per-element affinity
-     levels + Spirit status, entities, enemies, HP, velocity, collision, owned
-     spells + levels, per-spell multipliers, upgrade stacks, enemy scale,
-     element, projectile count). The bottom-left HUD shows the live affinity list
-     (e.g. 🔥 Fire Lv12 / 💧 Water Locked).
+   9. **PauseScene** (Esc/P) overlays resume / fullscreen / quit options.
+      Press **F1** for the debug overlay (character level, per-element affinity
+      levels + Spirit status, entities, enemies, HP, velocity, collision, owned
+      spells + levels, per-spell multipliers, upgrade stacks, enemy scale,
+      element, projectile count, **awakened elements, active burn count, and
+      whether a Fire Awakening is ready to trigger**). The bottom-left HUD shows
+      the live affinity list (e.g. 🔥 Fire Lv12 ✦ / 💧 Water Locked), where ✦
+      marks an Awakened element.
+   10. **AwakeningSystem** (v0.0.8) is a one-time, permanent milestone per element.
+       When **Fire Affinity ≥ 10** AND **Character Level ≥ 10**, gameplay briefly
+       freezes for a cinematic (fading music, slight desaturation, a glowing magic
+       circle + embers under the player, slight zoom, small shake, awakening
+       sound, and the line *"The Flame has acknowledged your existence." / 🔥 Fire
+       Awakening*). The reward is deliberately visual, not a stat spike: **Burn is
+       unlocked** (small DoT + unique flame particles), the **Fireball trail
+       brightens**, its **sprite gets a subtle upgrade**, and the **UI icon gains
+       an awakened ✦ mark**. Awakening state persists via the `awakenings` save
+       section; Water/Air/Earth are declared (future), and **Spirit is a hidden
+       placeholder that never triggers or reveals anything**. A new **AWAKENINGS**
+       Codex page tracks each element's unlocked/locked state.
 
 ## Future systems (architecture is ready)
 
