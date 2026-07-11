@@ -1,4 +1,64 @@
 {
-  "version": 1,
-  "weather": []
+  "version": 2,
+  "changeIntervalMs": { "min": 28000, "max": 46000 },
+  "transitionMs": 2600,
+  "weather": [
+    {
+      "id": "sunny",
+      "name": "Sunny",
+      "weight": 30,
+      "lighting": null,
+      "lightingAlpha": 0,
+      "modifiers": {}
+    },
+    {
+      "id": "rain",
+      "name": "Rain",
+      "weight": 28,
+      "lighting": "#2a3f6b",
+      "lightingAlpha": 0.18,
+      "modifiers": { "waterAffinityGain": 1.1, "fireDamage": 0.95 },
+      "event": "A strange rain begins to fall..."
+    },
+    {
+      "id": "ashfall",
+      "name": "Ashfall",
+      "weight": 22,
+      "lighting": "#5a3a1f",
+      "lightingAlpha": 0.14,
+      "modifiers": { "fireDamage": 1.05, "waterProjectileSpeed": 0.95 }
+    },
+    {
+      "id": "fog",
+      "name": "Fog",
+      "weight": 20,
+      "lighting": "#aab0b8",
+      "lightingAlpha": 0.1,
+      "modifiers": { "enemySpeed": 0.85 }
+    },
+    {
+      "id": "storm",
+      "name": "Storm",
+      "weight": 0,
+      "future": true
+    },
+    {
+      "id": "snow",
+      "name": "Snow",
+      "weight": 0,
+      "future": true
+    },
+    {
+      "id": "eclipse",
+      "name": "Eclipse",
+      "weight": 0,
+      "future": true
+    },
+    {
+      "id": "void_rain",
+      "name": "Void Rain",
+      "weight": 0,
+      "future": true
+    }
+  ]
 }

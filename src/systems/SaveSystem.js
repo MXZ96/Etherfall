@@ -42,6 +42,12 @@ function defaultSave() {
       levels: {},
       history: [],
     },
+    // World Tree (v0.0.9): recognition state of the Ancient Forces. Maps each
+    // force id to its recognition state (unknown / known / acknowledged). Just
+    // the shape needed so the World Tree survives reloads without migration.
+    worldtree: {
+      forces: {},
+    },
   };
 }
 
@@ -80,6 +86,7 @@ export class SaveSystem {
       settings: { ...base.settings, ...(parsed.settings || {}) },
       progress: { ...base.progress, ...(parsed.progress || {}) },
       awakenings: { ...base.awakenings, ...(parsed.awakenings || {}) },
+      worldtree: { ...base.worldtree, ...(parsed.worldtree || {}) },
     };
   }
 

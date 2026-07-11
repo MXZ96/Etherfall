@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "forces": [
+    {
+      "id": "fire",
+      "name": "Fire",
+      "loreName": "The First Flame",
+      "element": "fire",
+      "starting": true,
+      "description": "The First Flame. It warms, it consumes, and it acknowledges those who walk beside it."
+    },
+    {
+      "id": "water",
+      "name": "Water",
+      "loreName": "The Endless Tide",
+      "element": "water",
+      "starting": false,
+      "description": "The Endless Tide. Patient and endless, it remembers every reflection it has touched."
+    },
+    {
+      "id": "air",
+      "name": "Air",
+      "loreName": "The Whispering Sky",
+      "element": "air",
+      "starting": false,
+      "description": "The Whispering Sky. It speaks in breezes and carries the unspoken words of the world."
+    },
+    {
+      "id": "earth",
+      "name": "Earth",
+      "loreName": "The Eternal Stone",
+      "element": "earth",
+      "starting": false,
+      "description": "The Eternal Stone. Unmoving, it measures time in ages and roots the world in place."
+    },
+    {
+      "id": "spirit",
+      "name": "Spirit",
+      "loreName": "The Silent Witness",
+      "element": "spirit",
+      "hidden": true,
+      "description": "The Silent Witness. It observes what has not yet come to pass."
+    }
+  ]
+}

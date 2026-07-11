@@ -29,7 +29,7 @@ const ELEMENT_EMOJI = {
 // Element -> emoji/name for the affinity (elemental progression) HUD list.
 const AFFINITY_EMOJI = {
   fire: "🔥",
-  water: "💧",
+  water: "🌊",
   air: "🌪",
   earth: "🌍",
   spirit: "👻",
@@ -85,11 +85,19 @@ export class HUD {
     }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(1001);
 
     // Bottom-left: elemental affinity progression (one row per element).
-    this.affinityText = scene.add.text(MARGIN, GAME.HEIGHT - 132, "", {
+    this.affinityText = scene.add.text(MARGIN, GAME.HEIGHT - 196, "", {
       ...base,
       fontSize: "14px",
       color: "#c3c8d4",
       lineSpacing: 4,
+    }).setOrigin(0, 0).setScrollFactor(0).setDepth(1001);
+
+    // Bottom-left: weather status.
+    this.weatherText = scene.add.text(MARGIN, GAME.HEIGHT - 64, "", {
+      ...base,
+      fontSize: "12px",
+      color: "#8a8f9c",
+      lineSpacing: 2,
     }).setOrigin(0, 0).setScrollFactor(0).setDepth(1001);
 
     // Debug block (hidden until F1 toggles debug mode)
@@ -147,6 +155,9 @@ export class HUD {
     // --- Bottom-left: elemental affinity ---
     this.affinityText.setText(this.formatAffinities(s.affinities));
 
+    // --- Bottom-left: weather ---
+    this.weatherText.setText(this.formatWeather(s.weatherId));
+
     // --- Debug block (F1) ---
     this.debugText.setVisible(!!s.debug);
     if (s.debug) {
@@ -154,27 +165,35 @@ export class HUD {
     }
   }
 
-  /** Render the owned-spell list (name, level, projectile count, cooldown). */
+  /** Render the owned-spell list (name, state, cooldown/duration). */
   formatSpells(spells) {
     if (!spells || spells.length === 0) return "—";
     return spells
       .map((sp) => {
         const emoji = ELEMENT_EMOJI[sp.element] || "✨";
-        const cd = sp.active
-          ? sp.ready
-            ? "Ready"
-            : `CD ${(sp.cdMs / 1000).toFixed(1)}s`
-          : "";
         const mark = sp.awakened ? " ✦" : "";
-        return `${emoji} ${sp.name} Lv${sp.level}${mark}  ×${sp.projectileCount}${cd ? `  (${cd})` : ""}`;
+        const base = `${emoji} ${sp.name} Lv${sp.level}${mark}`;
+
+        let status = "";
+        if (sp.state === "ACTIVE") {
+          status = "ACTIVE";
+        } else if (sp.state === "COOLDOWN") {
+          status = (sp.remainingMs / 1000).toFixed(1) + "s";
+        } else {
+          status = "Ready";
+        }
+
+        return `${base}  (${status})`;
       })
       .join("\n");
   }
 
-  /** Render the elemental affinity list (e.g. 🔥 Fire Lv12 ✦ / 💧 Water Locked). */
+  /** Render the elemental affinity list (e.g. 🔥 Fire Lv12 ✦ / 🌊 Water Lv4). */
   formatAffinities(affinities) {
     if (!affinities || affinities.length === 0) return "";
-    return affinities
+    const visible = affinities.filter((a) => !a.hidden);
+    if (visible.length === 0) return "";
+    return visible
       .map((a) => {
         const emoji = AFFINITY_EMOJI[a.id] || "✨";
         const name = AFFINITY_NAMES[a.id] || a.id;
@@ -187,14 +206,11 @@ export class HUD {
 
   /** Render the F1 debug block including the current spell build. */
   formatDebug(s) {
-    const spells = (s.spells || [])
-      .map((sp) => `  ${sp.name} Lv${sp.level} [${sp.element}] ×${sp.projectileCount}`)
-      .join("\n");
     const mults = (s.spellMults || [])
       .map((m) => `  ${m.name}: dmg x${m.dmgMult.toFixed(2)} cd x${m.cdMult.toFixed(2)} size x${m.sizeMult.toFixed(2)}`)
       .join("\n");
-    const upgrades = (s.upgradeStacks && s.upgradeStacks.length)
-      ? s.upgradeStacks.join(", ")
+    const upgrades = (s.activeUpgrades && s.activeUpgrades.length)
+      ? s.activeUpgrades.join(", ")
       : "none";
     const enemyScale = s.enemyScale != null ? s.enemyScale.toFixed(2) : "1.00";
     const aff = (s.affinities || [])
@@ -208,44 +224,49 @@ export class HUD {
       .map((c) => `  ${c.cat}: ${c.discovered}/${c.total} (${Math.round(c.pct * 100)}%)`)
       .join("\n");
     const overall = s.codexOverall != null ? `${Math.round(s.codexOverall * 100)}%` : "0%";
-    const knownSpells = (s.codexKnownSpells || [])
-      .map((n) => `  ${n}`)
+
+    const spellStates = (s.spells || [])
+      .map((sp) => {
+        const state = sp.state || "READY";
+        const remaining = sp.remainingMs != null ? `${Math.round(sp.remainingMs)}ms` : "—";
+        return `  ${sp.name} [${sp.element}]: ${state}  Remaining: ${remaining}`;
+      })
       .join("\n") || "  none";
-    const lockedSpells = (s.codexLockedSpells || [])
-      .map((n) => `  ${n}`)
+
+    const cooldowns = (s.spells || [])
+      .map((sp) => `  ${sp.name}: ${sp.state === "COOLDOWN" ? `${(sp.remainingMs / 1000).toFixed(1)}s` : sp.state === "ACTIVE" ? "Active" : "Ready"}`)
       .join("\n") || "  none";
-    const discoveredEnemies = (s.codexDiscoveredEnemies || [])
-      .map((n) => `  ${n}`)
-      .join("\n") || "  none";
+
     const awakened = (s.awakenedElements && s.awakenedElements.length)
       ? s.awakenedElements.join(", ")
       : "none";
     const burn = s.burnActive != null ? s.burnActive : 0;
     const ready = s.awakeningReady ? "YES" : "no";
+    const projBehaviors = (s.projectiles > 0) ? "Standard" : "None";
+    const areaStatus = (s.areaSpellStatus || []).join("\n") || "  none";
+    const wc = s.waterCircleDebug || { state: "READY", durationTimer: 0, cooldownTimer: 0, exists: false };
     return (
       `FPS ${s.fps}\n` +
       `ENTITY ${s.entityCount}\n` +
       `ENEMIES ${s.enemyCount}\n` +
-      `PROJECTILES ${s.projectiles}\n` +
-      `MAGIC ${s.magicName} (${s.magicElement})\n` +
-      `MAGIC CD ${Math.ceil(s.magicCdMs)}ms\n` +
-      `ENEMY SCALE x${enemyScale}\n` +
-      `DMG EVENTS ${s.damageEvents}\n` +
-      `PLAYER HP ${Math.ceil(s.playerHp)} / ${s.maxHp}\n` +
-      `VEL ${s.velX}, ${s.velY}\n` +
-      `COLLISION ${s.colliding ? "INVULN" : "clear"}\n` +
+      `PROJECTILES ${s.projectiles}  (${projBehaviors})\n` +
+      `AREA SPELLS\n${areaStatus}\n` +
+      `WATER CIRCLE (water_circle)\n` +
+      `  State: ${wc.state}\n` +
+      `  Duration Timer: ${Math.round(wc.durationTimer)}ms\n` +
+      `  Cooldown Timer: ${Math.round(wc.cooldownTimer)}ms\n` +
+      `  Water Circle Exists: ${wc.exists ? "True" : "False"}\n` +
+      `SPELL STATES\n${spellStates}\n` +
+      `SPELL COOLDOWNS\n${cooldowns}\n` +
       `CHAR LVL ${s.level}\n` +
       `EXP ${s.exp} / ${s.expRequired}\n` +
       `POS ${Math.round(s.playerX)}, ${Math.round(s.playerY)}\n` +
+      `VEL ${s.velX}, ${s.velY}\n` +
+      `COLLISION ${s.colliding ? "INVULN" : "clear"}\n` +
       `AWAKENED ${awakened}\n` +
       `BURN ACTIVE ${burn}\n` +
       `AWAKEN READY ${ready}\n` +
       `SPELL MULTS\n${mults}\n` +
-      `SPELLS\n${spells}\n` +
-      `KNOWN SPELLS\n${knownSpells}\n` +
-      `LOCKED SPELLS\n${lockedSpells}\n` +
-      `DISCOVERED ENEMIES\n${discoveredEnemies}\n` +
-      `AFFINITY\n${aff}\n` +
       `UPGRADE STACKS ${upgrades}\n` +
       `CODEX\n${codex}\n` +
       `OVERALL ${overall}`
@@ -258,5 +279,12 @@ export class HUD {
     const m = Math.floor(total / 60).toString().padStart(2, "0");
     const s = (total % 60).toString().padStart(2, "0");
     return `${m}:${s}`;
+  }
+
+  /** Format current weather for the HUD. */
+  formatWeather(weatherId) {
+    if (!weatherId) return "";
+    const name = weatherId.charAt(0).toUpperCase() + weatherId.slice(1).replace(/_/g, " ");
+    return `Weather: ${name}`;
   }
 }

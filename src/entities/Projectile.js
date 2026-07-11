@@ -28,16 +28,17 @@ export class Projectile extends LivingEntity {
   }
 
   /**
-   * Configure and launch this projectile.
-   * @param {Magic} magic      spell definition wrapper
-   * @param {number} angle     travel direction (radians)
-   * @param {number} color     tint (element colour, numeric)
-   */
-  fire(magic, angle, color) {
+    * Configure and launch this projectile.
+    * @param {Magic} magic      spell definition wrapper
+    * @param {number} angle     travel direction (radians)
+    * @param {number} color     tint (element colour, numeric)
+    * @param {number} [speedMult=1]  weather-driven projectile speed multiplier
+    */
+  fire(magic, angle, color, speedMult = 1) {
     this.magic = magic;
     this.element = magic.element;
     this.damage = magic.damage;
-    this.speed = magic.speed;
+    this.speed = magic.speed * speedMult;
     this.range = magic.range;
     this.size = magic.size;
     this.lifetime = magic.lifetime ?? 1500;
@@ -47,6 +48,8 @@ export class Projectile extends LivingEntity {
     this.explode = !!magic.explode; // detonate on impact (AoE)
     this.returning = !!magic.returning; // boomerang back to caster
     this.burnChance = magic.burnChance || 0; // chance to apply burn on hit
+    this.pierce = magic.pierce || 0; // enemies to pierce through (0 = none)
+    this.pierceCount = 0; // current pierce count
     this.bouncesRemaining = this.returning ? 1 : 0; // remaining return trips
     this.startBounces = this.bouncesRemaining;
     this.recentHits = new Set(); // enemies already struck this flight
@@ -92,6 +95,9 @@ export class Projectile extends LivingEntity {
   /** Record an enemy as struck this flight. */
   markHit(enemy) {
     this.recentHits.add(enemy);
+    if (this.pierce > 0) {
+      this.pierceCount++;
+    }
   }
 
   /** Return to the pool for reuse. */
@@ -101,6 +107,8 @@ export class Projectile extends LivingEntity {
     this.clearTint();
     this.setBlendMode(Phaser.BlendModes.NORMAL);
     this.setScale(1).setAlpha(1);
+    this.pierceCount = 0;
+    this.recentHits.clear();
   }
 
   /** Per-frame update: track distance/age and emit a trail puff. */
@@ -131,17 +139,18 @@ export class Projectile extends LivingEntity {
 
   /** Cheap fading glow puff behind the projectile (brighter once Fire Awakens). */
   spawnTrail() {
-    const brighter = this.scene.awakenedFire && this.element === "fire";
-    const size = brighter ? this.size * 0.95 : this.size * 0.7;
-    const alpha = brighter ? 0.85 : 0.5;
+    const isWater = this.element === "water";
+    const isFireAwakened = this.scene.awakenedFire && this.element === "fire";
+    const size = isFireAwakened ? this.size * 0.95 : isWater ? this.size * 0.8 : this.size * 0.7;
+    const alpha = isFireAwakened ? 0.85 : isWater ? 0.6 : 0.5;
     const puff = this.scene.add.circle(this.x, this.y, size, this.color, alpha)
       .setDepth(5)
       .setBlendMode(Phaser.BlendModes.ADD);
     this.scene.tweens.add({
       targets: puff,
-      scale: 0,
+      scale: isWater ? 1.6 : 0,
       alpha: 0,
-      duration: 220,
+      duration: isWater ? 350 : 220,
       onComplete: () => puff.destroy(),
     });
   }

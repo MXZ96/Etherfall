@@ -19,7 +19,7 @@
       "unlocked": false,
       "hidden": false,
       "locked": false,
-      "affinityUnlock": { "element": "fire", "level": 15 }
+      "affinityUnlock": null
     },
     "air": {
       "name": "Air",

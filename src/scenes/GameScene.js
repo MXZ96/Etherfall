@@ -33,12 +33,14 @@ import { EnemyManager } from "../entities/EnemyManager.js";
 import { InputManager } from "../managers/InputManager.js";
 import { LevelSystem } from "../systems/LevelSystem.js";
 import { DamageSystem } from "../systems/DamageSystem.js";
-import { MagicSystem } from "../systems/MagicSystem.js";
+import { SpellManager } from "../systems/SpellManager.js";
 import { UpgradeSystem } from "../systems/UpgradeSystem.js";
 import { AffinitySystem } from "../systems/AffinitySystem.js";
 import { SpellPoolSystem } from "../systems/SpellPoolSystem.js";
 import { CodexSystem } from "../systems/CodexSystem.js";
 import { AwakeningSystem } from "../systems/AwakeningSystem.js";
+import { WeatherSystem } from "../systems/WeatherSystem.js";
+import { WorldTreeSystem } from "../systems/WorldTreeSystem.js";
 import { DiscoveryEventUI } from "../ui/DiscoveryEventUI.js";
 import { HUD } from "../ui/HUD.js";
 import { LevelUpUI } from "../ui/LevelUpUI.js";
@@ -140,7 +142,11 @@ export class GameScene extends Phaser.Scene {
       runChildUpdate: false,
       maxSize: PROJECTILE_POOL,
     });
-    this.magicSystem = new MagicSystem(
+
+    // --- Area spells (Water Circle, future AoE effects) ---
+    this.areaSpells = [];
+
+    this.magicSystem = new SpellManager(
       this,
       this.player,
       this.projectiles,
@@ -186,6 +192,14 @@ export class GameScene extends Phaser.Scene {
     this.codex = new CodexSystem(this, this.save, data);
     this.registry.set("codex", this.codex);
 
+    // --- World Tree (Ancient Forces recognition) ---
+    this.worldTree = new WorldTreeSystem(this, data, this.save);
+    this.registry.set("worldTree", this.worldTree);
+
+    // --- Weather System (v0.0.9) ---
+    this.weatherSystem = new WeatherSystem(this, data, this.audio);
+    this.waterDiscoveryTriggered = false;
+
     // --- Discovery toasts ---
     this.discoveryUI = new DiscoveryEventUI(this);
 
@@ -203,6 +217,7 @@ export class GameScene extends Phaser.Scene {
     this.awakening = false; // an awakening cinematic is playing
     this.runTime = 0; // ms of active play
     this.damageEvents = 0; // debug counter
+    this.spellCooldowns = {}; // spellId -> remaining cooldown ms (for HUD)
 
     // --- Burn particle emitter (shared, self-cleaning) ---
     // Small upward flame puffs emitted on burning enemies. Created once and
@@ -233,6 +248,9 @@ export class GameScene extends Phaser.Scene {
     this.game.events.on(EVENTS.ELEMENT_DISCOVERED, this.onElementDiscovered, this);
     this.game.events.on(EVENTS.ENEMY_DISCOVERED, this.onEnemyDiscovered, this);
     this.game.events.on(EVENTS.AWAKENING_STARTED, this.onAwakeningStarted, this);
+    this.game.events.on(EVENTS.WEATHER_CHANGED, this.onWeatherChanged, this);
+    this.game.events.on(EVENTS.FORCE_DISCOVERED, this.onForceDiscovered, this);
+    this.game.events.on(EVENTS.FORCE_ACKNOWLEDGED, this.onForceAcknowledged, this);
     this.events.once("shutdown", this.onShutdown, this);
   }
 
@@ -259,10 +277,10 @@ export class GameScene extends Phaser.Scene {
       velY: Math.round(this.player.body.velocity.y),
       colliding: this.player.isInvincible(),
       // Magic / projectiles (HUD + debug)
-      magicName: this.magicSystem.activeName,
-      magicElement: this.magicSystem.active ? this.magicSystem.active.element : "",
-      magicReady: this.magicSystem.isReady,
-      magicCdMs: this.magicSystem.cooldownRemaining,
+      magicName: this.magicSystem.ownedMagics[0]?.name || "—",
+      magicElement: this.magicSystem.ownedMagics[0]?.element || "",
+      magicReady: this.magicSystem.ownedMagics.some((m) => (this.magicSystem.cooldowns[m.id] || 0) <= 0),
+      magicCdMs: this.magicSystem.cooldowns[this.magicSystem.ownedMagics[0]?.id] || 0,
       projectiles: this.projectiles.countActive(true),
       damageEvents: this.damageEvents,
       debug: this.debug,
@@ -273,9 +291,9 @@ export class GameScene extends Phaser.Scene {
         element: m.element,
         level: m.level,
         projectileCount: m.projectileCount,
-        active: m === this.magicSystem.active,
-        ready: m === this.magicSystem.active ? this.magicSystem.isReady : true,
-        cdMs: m === this.magicSystem.active ? this.magicSystem.cooldownRemaining : 0,
+        state: this.magicSystem.getState(m.id),
+        remainingMs: this.magicSystem.getRemaining(m.id),
+        type: m.base.type || "projectile",
         awakened: this.awakeningSystem.isAwakened(m.element),
       })),
       // Debug-only build info
@@ -316,9 +334,26 @@ export class GameScene extends Phaser.Scene {
         : [],
       codexDiscoveredEnemies: this.codex ? this.codex.getDiscovered("enemies") : [],
       // Elemental Awakening (v0.0.8) — HUD badges + debug
-      awakenedElements: this.awakeningSystem.getAwakenedElements(),
+       awakenedElements: this.awakeningSystem.getAwakenedElements(),
       awakeningReady: this.awakeningSystem.canTrigger("fire"),
       burnActive: this.countBurningEnemies(),
+      // Weather (v0.0.9)
+      weatherId: this.weatherSystem ? this.weatherSystem.getCurrent().id : "sunny",
+      // World Tree (v0.0.9)
+      worldTreeForces: this.worldTree
+        ? this.worldTree.getForces().map((f) => ({
+            id: f.id,
+            name: f.loreName || f.name,
+            state: this.worldTree.forceState(f.id),
+          }))
+        : [],
+      // Area spells (Water Circle status for HUD/debug)
+      areaSpellStatus: this.areaSpells.map((a) => {
+        const remaining = Math.max(0, a.duration - a.age);
+        return `${a.magic.name}: Active ${remaining}ms`;
+      }),
+      // Water Circle lifecycle debug (F1) — verifies the READY→ACTIVE→COOLDOWN loop
+      waterCircleDebug: this.magicSystem.getDebugInfo("water_circle"),
     });
 
     // While a level-up overlay or awakening cinematic is open, the world freezes.
@@ -370,6 +405,29 @@ export class GameScene extends Phaser.Scene {
     for (let i = 0; i < pchildren.length; i++) {
       if (pchildren[i].active) pchildren[i].tick(delta);
     }
+
+    // Area spells (Water Circle) tick + cleanup.
+    const ec = this.enemies.getChildren();
+    for (let i = this.areaSpells.length - 1; i >= 0; i--) {
+      const a = this.areaSpells[i];
+      if (!a.active) {
+        this.areaSpells.splice(i, 1);
+        continue;
+      }
+      a.tick(delta, ec, (enemy, dmg, element) => {
+        this.damageSystem.applyDamage(enemy, dmg, {
+          type: "element",
+          element,
+          source: a,
+        });
+      });
+    }
+
+    // Weather System update.
+    if (this.weatherSystem) this.weatherSystem.update(delta);
+
+    // Water Discovery Event check.
+    this.checkWaterDiscovery();
   }
 
   // ------------------------------------------------------------------------
@@ -421,7 +479,8 @@ export class GameScene extends Phaser.Scene {
 
     // Affinity bonus: Fire Lv10+ adds a damage multiplier to that element.
     const affMult = this.affinitySystem.getDamageMultiplier(projectile.element);
-    const dmg = Math.max(1, Math.round(projectile.damage * affMult));
+    const weatherMult = this.weatherSystem ? this.weatherSystem.getDamageMult(projectile.element) : 1;
+    const dmg = Math.max(1, Math.round(projectile.damage * affMult * weatherMult));
 
     const color = this.elementColors[projectile.element] ?? 0xffffff;
     this.damageSystem.applyDamage(enemy, dmg, {
@@ -429,7 +488,8 @@ export class GameScene extends Phaser.Scene {
       element: projectile.element,
       source: projectile,
     });
-    this.spawnHitEffect(enemy.x, enemy.y, color, this.isFireAwakened(projectile));
+    const isWater = projectile.element === "water";
+    this.spawnHitEffect(enemy.x, enemy.y, color, this.isFireAwakened(projectile), isWater);
 
     // Burn: unlocked by the Fire Awakening (plus a bonus from the Burn Chance
     // upgrade and the Fire Lv20 affinity milestone). Gated on awakening so Burn
@@ -459,7 +519,11 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    projectile.despawn();
+    // Pierce: default projectiles stop after the first enemy; pierced ones
+    // continue until they exceed their pierce count (pierce N = N+1 hits).
+    if (projectile.pierce === 0 || projectile.pierceCount > projectile.pierce) {
+      projectile.despawn();
+    }
   }
 
   /** Apply a burn status effect to an enemy (driven by data/status_effect.json). */
@@ -533,19 +597,43 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** Small additive burst where a projectile connects. `boost` = awakened Fire. */
-  spawnHitEffect(x, y, color, boost = false) {
-    const r = boost ? 17 : 12;
-    const burst = this.add
-      .circle(x, y, r, color, boost ? 1 : 0.8)
-      .setDepth(6)
-      .setBlendMode(Phaser.BlendModes.ADD);
-    this.tweens.add({
-      targets: burst,
-      scale: 0,
-      alpha: 0,
-      duration: boost ? 260 : 200,
-      onComplete: () => burst.destroy(),
-    });
+  spawnHitEffect(x, y, color, boost = false, isWater = false) {
+    if (isWater) {
+      // Water splash: ripple ring.
+      const ring = this.add.circle(x, y, 6, color, 0.7)
+        .setDepth(6)
+        .setBlendMode(Phaser.BlendModes.ADD);
+      this.tweens.add({
+        targets: ring,
+        scale: 2.5,
+        alpha: 0,
+        duration: 350,
+        onComplete: () => ring.destroy(),
+      });
+      const splash = this.add.circle(x, y, 10, color, 0.4)
+        .setDepth(6)
+        .setBlendMode(Phaser.BlendModes.ADD);
+      this.tweens.add({
+        targets: splash,
+        scale: 3,
+        alpha: 0,
+        duration: 400,
+        onComplete: () => splash.destroy(),
+      });
+    } else {
+      const r = boost ? 17 : 12;
+      const burst = this.add
+        .circle(x, y, r, color, boost ? 1 : 0.8)
+        .setDepth(6)
+        .setBlendMode(Phaser.BlendModes.ADD);
+      this.tweens.add({
+        targets: burst,
+        scale: 0,
+        alpha: 0,
+        duration: boost ? 260 : 200,
+        onComplete: () => burst.destroy(),
+      });
+    }
   }
 
   /** True when a fire projectile is enhanced by the Fire Awakening. */
@@ -565,7 +653,9 @@ export class GameScene extends Phaser.Scene {
     this.levelSystem.gainExp(reward);
     // Affinity EXP: half the enemy's EXP, attributed to the killing element.
     if (source && source.element && this.affinitySystem.elements[source.element]) {
-      this.affinitySystem.grantExp(source.element, Math.ceil(reward / 2));
+      const baseAffinityExp = Math.ceil(reward / 2);
+      const weatherMult = this.weatherSystem ? this.weatherSystem.getAffinityGainMult(source.element) : 1;
+      this.affinitySystem.grantExp(source.element, Math.ceil(baseAffinityExp * weatherMult));
     }
     // Codex: discover enemy on first kill.
     if (this.codex && entity.def && entity.def.name) {
@@ -707,10 +797,6 @@ export class GameScene extends Phaser.Scene {
       m.owned = known.includes(m.id) && !m.locked;
     });
     this.magicSystem.ownedMagics = this.magicSystem.magics.filter((m) => m.owned);
-    if (this.magicSystem.ownedMagics.length === 0 && this.magicSystem.magics.length > 0) {
-      this.magicSystem.activeIndex = 0;
-      this.magicSystem.active = this.magicSystem.magics[0];
-    }
   }
 
   // ------------------------------------------------------------------------
@@ -968,6 +1054,225 @@ export class GameScene extends Phaser.Scene {
     return n;
   }
 
+  // ------------------------------------------------------------------------
+  // Water Discovery Event (v0.0.9)
+  // ------------------------------------------------------------------------
+
+  /**
+   * Check if the Water Discovery Event should trigger.
+   * Requirements:
+   *  - Character Level >= 10
+   *  - Fire Affinity >= 10
+    *  - Fire Awakening completed
+   *  - Currently raining
+   *  - Not yet triggered
+   */
+  checkWaterDiscovery() {
+    if (this.waterDiscoveryTriggered) return;
+    if (this.leveling || this.awakening) return;
+
+    const charLevel = this.levelSystem.getLevel();
+    const fireAffinity = this.affinitySystem.getLevel("fire");
+    const fireAwakened = this.awakeningSystem.isAwakened("fire");
+    const isRaining = this.weatherSystem && this.weatherSystem.isRaining();
+
+    if (charLevel >= 10 && fireAffinity >= 10 && fireAwakened && isRaining) {
+      this.triggerWaterDiscovery();
+    }
+  }
+
+  /** Trigger the Water Discovery Event. */
+  triggerWaterDiscovery() {
+    this.waterDiscoveryTriggered = true;
+    this.awakening = true;
+    this.physics.world.pause();
+
+    // Intensify rain.
+    if (this.weatherSystem) this.weatherSystem.burstRain(5000);
+
+    // Soft blue lighting.
+    const blueLight = this.add
+      .rectangle(0, 0, GAME.WIDTH, GAME.HEIGHT, 0x1a3a5c, 0)
+      .setOrigin(0)
+      .setScrollFactor(0)
+      .setDepth(1800);
+    this.tweens.add({ targets: blueLight, alpha: 0.25, duration: 2000 });
+
+    // Water particles circle the player.
+    this.spawnWaterCircle(this.player.x, this.player.y);
+
+    // Play discovery sound.
+    this.audio.playWaterDiscovery();
+
+    // Show discovery text after a brief pause.
+    this.time.delayedCall(1500, () => {
+      this.showDiscoveryText({
+        line1: "The Endless Tide accepts your reflection.",
+        line2: "Water Discovered",
+        color: "#3aa0ff",
+      });
+    });
+
+    // Complete discovery after cinematic.
+    this.time.delayedCall(4500, () => {
+      this.finishWaterDiscovery(blueLight);
+    });
+  }
+
+  /** Spawn circling water particles around the player. */
+  spawnWaterCircle(x, y) {
+    const waterColor = Phaser.Display.Color.HexStringToColor("#3aa0ff").color;
+    const particles = [];
+    const count = 24;
+
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2;
+      const px = x + Math.cos(angle) * 50;
+      const py = y + Math.sin(angle) * 50;
+      const p = this.add.circle(px, py, 4, waterColor, 0.8)
+        .setDepth(9)
+        .setBlendMode(Phaser.BlendModes.ADD);
+      particles.push({ obj: p, angle, radius: 50 });
+    }
+
+    // Animate particles orbiting.
+    this.waterCircleTimer = this.time.addEvent({
+      delay: 16,
+      repeat: 280,
+      callback: () => {
+        particles.forEach((p) => {
+          p.angle += 0.04;
+          p.obj.x = x + Math.cos(p.angle) * p.radius;
+          p.obj.y = y + Math.sin(p.angle) * p.radius;
+          p.obj.setAlpha(0.6 + Math.sin(p.angle * 3) * 0.3);
+        });
+      },
+    });
+
+    this.time.delayedCall(4500, () => {
+      if (this.waterCircleTimer) {
+        this.waterCircleTimer.remove(false);
+        this.waterCircleTimer = null;
+      }
+      particles.forEach((p) => {
+        this.tweens.add({
+          targets: p.obj,
+          alpha: 0,
+          scale: 0,
+          duration: 600,
+          onComplete: () => p.obj.destroy(),
+        });
+      });
+    });
+  }
+
+  /** Show cinematic text for the discovery. */
+  showDiscoveryText(def) {
+    const l1 = this.add
+      .text(this.scale.width / 2, this.scale.height / 2 - 26, def.line1, {
+        fontFamily: "Segoe UI, sans-serif",
+        fontSize: "20px",
+        color: "#e6e8ef",
+        fontStyle: "italic",
+        align: "center",
+        wordWrap: { width: 760 },
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(1900)
+      .setAlpha(0);
+    const l2 = this.add
+      .text(this.scale.width / 2, this.scale.height / 2 + 14, def.line2, {
+        fontFamily: "Segoe UI, sans-serif",
+        fontSize: "30px",
+        color: def.color || "#3aa0ff",
+        fontStyle: "bold",
+        align: "center",
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(1900)
+      .setAlpha(0);
+
+    this.tweens.add({ targets: [l1, l2], alpha: 1, duration: 500, ease: "Power2" });
+    this.tweens.add({
+      targets: [l1, l2],
+      alpha: 0,
+      delay: 2200,
+      duration: 600,
+      onComplete: () => {
+        l1.destroy();
+        l2.destroy();
+      },
+    });
+  }
+
+  /** Complete the water discovery: unlock systems and resume. */
+  finishWaterDiscovery(lightOverlay) {
+    // Unlock Water element.
+    this.affinitySystem.unlockElement("water");
+
+    // Unlock Water Bolt spell.
+    this.spellPool.unlock("water_circle");
+    this.syncSpellPool();
+
+    // Do NOT switch away from Fireball. Water Circle is simply added.
+
+    // Discover Water in World Tree.
+    this.worldTree.discoverForce("water");
+
+    // Discover codex entries.
+    if (this.codex) {
+      this.codex.discover("elements", "water");
+      this.codex.discover("spells", "water_circle");
+      this.codex.discover("forces", "water");
+    }
+
+    // Discovery toast.
+    this.discoveryUI.show("WATER DISCOVERED", "The Endless Tide");
+
+    // Clean up lighting.
+    if (lightOverlay) {
+      this.tweens.add({
+        targets: lightOverlay,
+        alpha: 0,
+        duration: 800,
+        onComplete: () => lightOverlay.destroy(),
+      });
+    }
+
+    // Resume after a moment.
+    this.time.delayedCall(1000, () => {
+      if (!this.leveling) this.physics.world.resume();
+      this.awakening = false;
+    });
+  }
+
+  // ------------------------------------------------------------------------
+  // Weather / World Tree event handlers
+  // ------------------------------------------------------------------------
+
+  onWeatherChanged(weatherId, def) {
+    // Future: change music based on weather.
+    // if (def && def.event) this.audio.playWeatherAmbience(weatherId);
+  }
+
+  onForceDiscovered(forceId, def) {
+    if (this.codex) {
+      this.codex.discover("forces", forceId);
+    }
+    const name = def ? def.loreName || def.name : forceId;
+    this.discoveryUI.show("ANCIENT FORCE DISCOVERED", name);
+  }
+
+  onForceAcknowledged(forceId, def) {
+    if (this.codex && def && def.reward && def.reward.codexEntry) {
+      this.codex.discover("awakenings", forceId);
+    }
+    const name = def ? def.name : forceId;
+    this.discoveryUI.show("FORCE ACKNOWLEDGED", name);
+  }
+
   /** Clean up global listeners so restarts don't double-bind. */
   onShutdown() {
     this.game.events.off(EVENTS.LEVEL_UP, this.onLevelUp, this);
@@ -982,5 +1287,8 @@ export class GameScene extends Phaser.Scene {
     this.game.events.off(EVENTS.ELEMENT_DISCOVERED, this.onElementDiscovered, this);
     this.game.events.off(EVENTS.ENEMY_DISCOVERED, this.onEnemyDiscovered, this);
     this.game.events.off(EVENTS.AWAKENING_STARTED, this.onAwakeningStarted, this);
+    this.game.events.off(EVENTS.WEATHER_CHANGED, this.onWeatherChanged, this);
+    this.game.events.off(EVENTS.FORCE_DISCOVERED, this.onForceDiscovered, this);
+    this.game.events.off(EVENTS.FORCE_ACKNOWLEDGED, this.onForceAcknowledged, this);
   }
 }

@@ -20,7 +20,7 @@ export class UpgradeSystem {
   /**
    * @param {Phaser.Scene} scene
    * @param {object} data          registry data (expects data.upgrades)
-   * @param {MagicSystem} magicSystem  owns the spells we upgrade
+   * @param {SpellManager} magicSystem  owns the spells we upgrade
    */
   constructor(scene, data, magicSystem) {
     this.scene = scene;
@@ -155,18 +155,22 @@ export class UpgradeSystem {
    */
   describe(upgrade, stacksTaken = 0) {
     if (!upgrade) return "";
-    const v = Math.round((upgrade.value || 0) / (1 + this.diminishingRate * stacksTaken));
+    const v = (upgrade.value || 0) / (1 + this.diminishingRate * stacksTaken);
     switch (upgrade.type) {
       case "damage":
-        return `Damage +${v}%`;
+        return `Damage +${Math.round(v)}%`;
       case "projectileCount":
-        return `Projectiles +${v}`;
+        return `Projectiles +${Math.round(v)}`;
       case "cooldown":
-        return `Cooldown -${v}%`;
+        return `Cooldown -${Math.round(v)}%`;
       case "size":
-        return `Size +${v}%`;
+        return `Size +${Math.round(v)}%`;
       case "burn":
-        return `Burn chance +${Math.round(v * 100)}%`;
+        return `Burn chance +${(v * 100).toFixed(0)}%`;
+      case "areaRadius":
+        return `Circle radius +${Math.round(v)}%`;
+      case "duration":
+        return `Duration +${Math.round(v)}%`;
       case "explode":
         return `Explodes on impact`;
       case "return":

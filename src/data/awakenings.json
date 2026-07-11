@@ -29,9 +29,9 @@
       "id": "water",
       "name": "Water Awakening",
       "element": "water",
-      "released": false,
+      "released": true,
       "hidden": false,
-      "locked": true,
+      "locked": false,
       "requirements": {
         "affinity": { "water": 10 },
         "level": 10

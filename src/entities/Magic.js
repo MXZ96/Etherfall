@@ -16,6 +16,7 @@
 
 import * as Phaser from "phaser";
 import { Projectile } from "./Projectile.js";
+import { AreaSpell } from "./AreaSpell.js";
 
 export class Magic {
   /**
@@ -38,12 +39,19 @@ export class Magic {
       range: def.range,
       lifetime: def.lifetime ?? 1500,
       projectileCount: def.projectileCount ?? 1,
+      pierce: def.pierce || 0,
+      type: def.type || "projectile",
+      areaRadius: def.areaRadius || 90,
+      duration: def.duration || 3000,
+      tickInterval: def.tickInterval || 400,
     };
 
     // --- Multipliers / additive bonuses driven by upgrades ---
-    this.damageMult = 1; // additive (each +10% upgrade adds 0.10)
-    this.cooldownMult = 1; // multiplicative (each -10% multiplies by 0.90)
-    this.sizeMult = 1; // additive (each +50% adds 0.50)
+    this.damageMult = 1;
+    this.cooldownMult = 1;
+    this.sizeMult = 1;
+    this.durationMult = 1;
+    this.areaRadiusMult = 1;
 
     // --- Special behaviours unlocked by upgrades ---
     this.burnChance = 0; // 0..1 chance to apply burn on hit
@@ -67,6 +75,13 @@ export class Magic {
     this.lifetime = this.base.lifetime;
     this.projectileCount = this.base.projectileCount;
 
+    // Effective area/lifecycle stats. These MUST be initialised here so the
+    // spell lifecycle works before any upgrade recompute() runs (recompute()
+    // is only invoked from applyUpgrade()).
+    this.areaRadius = this.base.areaRadius;
+    this.duration = this.base.duration;
+    this.tickInterval = this.base.tickInterval;
+
     this.level = 1;
   }
 
@@ -79,6 +94,28 @@ export class Magic {
     this.range = this.base.range;
     this.lifetime = this.base.lifetime;
     this.projectileCount = this.base.projectileCount;
+    this.pierce = this.base.pierce;
+    this.areaRadius = Math.max(10, this.base.areaRadius || 90);
+    this.duration = Math.max(500, Math.round((this.base.duration || 3000) * this.durationMult));
+    this.tickInterval = this.base.tickInterval;
+  }
+
+  /**
+   * Spawn area spell effects around the caster.
+   * @param {Phaser.Scene} scene
+   * @param {number} x
+   * @param {number} y
+   * @param {number} color
+   * @param {object} [followTarget] optional entity for the area to follow
+   * @returns {AreaSpell[]}
+   */
+  createAreaSpells(scene, x, y, color, followTarget) {
+    const out = [];
+    const n = Math.max(1, this.projectileCount);
+    for (let i = 0; i < n; i++) {
+      out.push(new AreaSpell(scene, this, x, y, color, followTarget));
+    }
+    return out;
   }
 
   /**
@@ -116,6 +153,16 @@ export class Magic {
         this.sizeMult = Math.min(next, this.limits.maxSizeMultiplier);
         break;
       }
+      case "areaRadius":
+        this.areaRadiusMult = (this.areaRadiusMult || 1) + v / 100;
+        this.base.areaRadius = Math.min(
+          Math.round(this.base.areaRadius * this.areaRadiusMult),
+          this.limits.maxAreaRadius || 200
+        );
+        break;
+      case "duration":
+        this.durationMult = this.durationMult + v / 100;
+        break;
       case "burn":
         this.burnChance = Math.min(1, this.burnChance + v);
         break;
@@ -139,7 +186,7 @@ export class Magic {
    * so a returning (Phoenix Core) projectile knows where to boomerang back to.
    * @returns {Projectile[]} spawned projectiles
    */
-  createProjectiles(scene, group, x, y, tx, ty, color, caster) {
+  createProjectiles(scene, group, x, y, tx, ty, color, caster, speedMult = 1) {
     const baseAngle = Math.atan2(ty - y, tx - x);
     const n = Math.max(1, this.projectileCount);
     const spread = Phaser.Math.DegToRad(12); // angular gap between shots
@@ -150,7 +197,7 @@ export class Magic {
       const angle = baseAngle + offset;
       const p = group.get(x, y);
       if (p) {
-        p.fire(this, angle, color);
+        p.fire(this, angle, color, speedMult);
         p.homeX = caster ? caster.x : x;
         p.homeY = caster ? caster.y : y;
         out.push(p);
@@ -159,3 +206,4 @@ export class Magic {
     return out;
   }
 }
+

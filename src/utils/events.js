@@ -34,6 +34,14 @@ export const EVENTS = {
   // Elemental Awakening (v0.0.8)
   AWAKENING_STARTED: "awakening:started",
 
+  // World Tree / Ancient Forces (v0.0.9)
+  FORCE_DISCOVERED: "force:discovered",
+  FORCE_ACKNOWLEDGED: "force:acknowledged",
+
+  // Weather + Water Discovery (v0.0.9)
+  WEATHER_CHANGED: "weather:changed",
+  DISCOVERY_STARTED: "discovery:started",
+
   // UI / Flow
   GAME_PAUSED: "flow:paused",
   GAME_RESUMED: "flow:resumed",
@@ -44,6 +52,9 @@ export const EVENTS = {
 
   // Spell Pool
   SPELL_UNLOCKED: "spell:unlocked",
+
+  // Spell lifecycle (v0.0.9.3a)
+  SPELL_EXPIRED: "spell:expired",
 
   // Codex / Discovery
   CODEX_UPDATED: "codex:updated",

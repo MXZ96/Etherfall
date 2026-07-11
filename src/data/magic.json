@@ -22,22 +22,20 @@
       }
     },
     {
-      "id": "water_bolt",
-      "name": "Water Bolt",
+      "id": "water_circle",
+      "name": "Water Circle",
       "element": "water",
       "status": "hidden",
-      "damage": 12,
-      "cooldown": 1800,
-      "speed": 500,
-      "range": 650,
-      "size": 10,
-      "lifetime": 1500,
-      "projectileCount": 1,
+      "type": "area",
+      "damage": 3,
+      "cooldown": 3800,
+      "areaRadius": 100,
+      "duration": 5000,
+      "tickInterval": 180,
       "limits": {
-        "maxProjectile": 8,
         "maxDamageMultiplier": 5,
-        "maxSizeMultiplier": 3,
-        "maxCooldownReduction": 50
+        "maxCooldownReduction": 50,
+        "maxAreaRadius": 200
       }
     },
     {

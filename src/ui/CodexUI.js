@@ -7,6 +7,7 @@
    ========================================================================== */
 
 import { GAME } from "../config/constants.js";
+import * as Phaser from "phaser";
 
 const ENTRY_H = 120;
 const ENTRY_GAP = 4;
@@ -25,6 +26,7 @@ const CATEGORY_META = {
   spells: { label: "Magic", icon: "✨" },
   enemies: { label: "Enemies", icon: "💀" },
   awakenings: { label: "Awakenings", icon: "✦" },
+  forces: { label: "World Tree", icon: "🌳" },
   artifacts: { label: "Artifacts", icon: "📜" },
   fusions: { label: "Fusion", icon: "🔮" },
   achievements: { label: "Achievements", icon: "🏆" },
@@ -168,6 +170,13 @@ export class CodexUI {
     const cx = GAME.WIDTH / 2;
     const panelW = GAME.WIDTH - 80;
     const startY = 118;
+
+    // The World Tree is a single animated view, not the standard entry cards.
+    if (this.activeCategory === "forces") {
+      this.buildForcesTree(entries);
+      return;
+    }
+
     const discovered = this.codex.countDiscovered(this.activeCategory);
     const total = this.codex.countTotal(this.activeCategory);
     this.completionText.setText(`${this.activeCategory.toUpperCase()}  ${discovered} / ${total}`);
@@ -235,6 +244,119 @@ export class CodexUI {
     return def.id || def.name || "";
   }
 
+  /**
+   * Render the World Tree as an animated, growing tree of Ancient Forces.
+   * Each encountered force gets a glowing node + a branch that grows out from
+   * the trunk (a scaleX tween = "branch growth"); undiscovered forces stay as
+   * dim "???" placeholders. Spirit is filtered out by CodexSystem.
+   */
+  buildForcesTree(entries) {
+    const cx = GAME.WIDTH / 2;
+    const panelW = GAME.WIDTH - 80;
+    const x0 = cx - panelW / 2 + 80;
+    const top = 160;
+    const gap = 110;
+
+    const total = this.codex.countTotal("forces");
+    const discovered = this.codex.countDiscovered("forces");
+    this.completionText.setText(`WORLD TREE  ${discovered} / ${total}`);
+
+    const trunkTop = top - 18;
+    const trunkBottom = top + (entries.length - 1) * gap + 18;
+    const trunkMid = (trunkTop + trunkBottom) / 2;
+    const trunk = this.scene.add
+      .rectangle(x0 - 4, trunkMid, 6, trunkBottom - trunkTop, 0x3a2d63, 1)
+      .setScrollFactor(0)
+      .setDepth(2102);
+    this.entries.push({ bg: trunk });
+
+    entries.forEach((def, i) => {
+      const y = top + i * gap;
+      const isDiscovered = this.codex.isDiscovered("forces", this.getId(def));
+      const color = Phaser.Display.Color.HexStringToColor(
+        (this.scene.elementColors && this.scene.elementColors[def.element]) || "#7b5cff"
+      ).color;
+
+      if (isDiscovered) {
+        const acknowledged =
+          this.scene.worldTree && this.scene.worldTree.isForceAcknowledged(def.id);
+        const branchLen = 70;
+        const branch = this.scene.add
+          .rectangle(x0, y, branchLen, 5, color, 0.8)
+          .setOrigin(0, 0.5)
+          .setScrollFactor(0)
+          .setDepth(2102)
+          .setBlendMode(Phaser.BlendModes.ADD)
+          .setScale(0, 1);
+        const node = this.scene.add
+          .circle(x0 + branchLen, y, 18, color, 1)
+          .setScrollFactor(0)
+          .setDepth(2103)
+          .setBlendMode(Phaser.BlendModes.ADD)
+          .setScale(0.2);
+
+        const title = this.scene.add
+          .text(x0 + branchLen + 28, y - 18, def.loreName || def.name, {
+            fontFamily: "Segoe UI, sans-serif",
+            fontSize: "14px",
+            color: acknowledged ? "#fff2c2" : "#e6e8ef",
+            fontStyle: "bold",
+          })
+          .setScrollFactor(0)
+          .setDepth(2103);
+        const sub = this.scene.add
+          .text(x0 + branchLen + 28, y + 6, this.getDescription(def), {
+            fontFamily: "Segoe UI, sans-serif",
+            fontSize: "11px",
+            color: "#c3c8d4",
+            wordWrap: { width: panelW - 220 },
+          })
+          .setScrollFactor(0)
+          .setDepth(2103);
+        const badge = acknowledged
+          ? this.scene.add
+              .text(x0 + branchLen + 28, y - 36, "ACKNOWLEDGED", {
+                fontFamily: "Segoe UI, sans-serif",
+                fontSize: "10px",
+                color: "#ffd166",
+                fontStyle: "bold",
+              })
+              .setScrollFactor(0)
+              .setDepth(2103)
+          : null;
+
+        this.scene.tweens.add({
+          targets: branch,
+          scaleX: 1,
+          duration: 520,
+          delay: i * 90,
+          ease: "Sine.easeOut",
+        });
+        this.scene.tweens.add({
+          targets: node,
+          scale: 1,
+          duration: 460,
+          delay: i * 90 + 220,
+          ease: "Back.easeOut",
+        });
+
+        this.entries.push({ bg: branch, title, desc: sub, detail: badge, lock: node });
+      } else {
+        const ph = this.scene.add
+          .text(x0 + 30, y, "???", {
+            fontFamily: "Segoe UI, sans-serif",
+            fontSize: "16px",
+            color: "#5a5f6e",
+            fontStyle: "bold",
+          })
+          .setOrigin(0, 0.5)
+          .setScrollFactor(0)
+          .setDepth(2103);
+        this.entries.push({ bg: ph });
+      }
+    });
+  }
+
   getTitle(def) {
     const emoji = this.getEmoji(def);
     const name = def.name || def.id || "???";
@@ -296,6 +418,16 @@ export class CodexUI {
   }
 
   applyScroll() {
+    if (this.activeCategory === "forces") {
+      this.entries.forEach((e) => {
+        e.bg && e.bg.setVisible(true);
+        e.title && e.title.setVisible(true);
+        e.desc && e.desc.setVisible(true);
+        e.detail && e.detail.setVisible(true);
+        e.lock && e.lock.setVisible(true);
+      });
+      return;
+    }
     const offset = -this.scrollY;
     this.entries.forEach((e, i) => {
       const y = this.listTop + i * (ENTRY_H + ENTRY_GAP) + offset + ENTRY_H / 2;

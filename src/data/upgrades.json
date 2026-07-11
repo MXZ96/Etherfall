@@ -105,6 +105,42 @@
       "type": "return",
       "value": 1,
       "maxStacks": 1
+    },
+    {
+      "id": "water_circle_pressure",
+      "name": "Pressure",
+      "rarity": "common",
+      "spell": "water_circle",
+      "type": "damage",
+      "value": 15,
+      "maxStacks": 10
+    },
+    {
+      "id": "water_circle_widen",
+      "name": "Widen Circle",
+      "rarity": "common",
+      "spell": "water_circle",
+      "type": "areaRadius",
+      "value": 15,
+      "maxStacks": 3
+    },
+    {
+      "id": "water_circle_swift_tide",
+      "name": "Swift Tide",
+      "rarity": "rare",
+      "spell": "water_circle",
+      "type": "cooldown",
+      "value": 12,
+      "maxStacks": 3
+    },
+    {
+      "id": "water_circle_heavy_surge",
+      "name": "Heavy Surge",
+      "rarity": "rare",
+      "spell": "water_circle",
+      "type": "size",
+      "value": 30,
+      "maxStacks": 2
     }
   ]
 }

@@ -83,4 +83,42 @@ export class AudioManager {
     // TODO: implement with a dedicated awakening bus once SFX assets exist.
     void elementId;
   }
+
+  /**
+   * Weather ambience channel (v0.0.9). No-op until audio assets exist; the
+   * hook is prepared so Rain / Ashfall / Fog each get their own bed later.
+   * @param {string} [weatherId]
+   */
+  playRainAmbience(weatherId) {
+    // TODO: implement with a weather bus once audio assets exist.
+    void weatherId;
+  }
+
+  /**
+   * Water Discovery fanfare (v0.0.9). No-op until audio assets exist.
+   */
+  playWaterDiscovery() {
+    // TODO: implement with a dedicated discovery bus once SFX assets exist.
+  }
+
+  /**
+   * Water Bolt cast sound (v0.0.9). No-op until audio assets exist.
+   */
+  playWaterBolt() {
+    // TODO: implement with a dedicated SFX bus once SFX assets exist.
+  }
+
+  /**
+   * Water Circle activation surge (v0.0.9.3). No-op until audio assets exist.
+   */
+  playWaterCircleActivate() {
+    // TODO: implement with a dedicated SFX bus once SFX assets exist.
+  }
+
+  /**
+   * Water Circle expiration splash (v0.0.9.3). No-op until audio assets exist.
+   */
+  playWaterCircleExpire() {
+    // TODO: implement with a dedicated SFX bus once SFX assets exist.
+  }
 }

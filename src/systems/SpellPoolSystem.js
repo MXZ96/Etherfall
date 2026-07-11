@@ -15,7 +15,7 @@ export class SpellPoolSystem {
   /**
    * @param {Phaser.Scene} scene
    * @param {object} data  registry data (expects data.magic)
-   * @param {MagicSystem} magicSystem  owns the spell instances
+   * @param {SpellManager} magicSystem  owns the spell instances
    */
   constructor(scene, data, magicSystem) {
     this.scene = scene;

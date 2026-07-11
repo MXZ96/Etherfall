@@ -1,8 +1,7 @@
 # Etherfall
 
 A browser **Bullet-Heaven Roguelite** (top-down action RPG) built with **Phaser 3**
-and **vanilla ES Modules**. This repository is **version 0.0.8** — Elemental
-Awakening. The player AUTO-CASTS Fireball at
+and **vanilla ES Modules**. This repository is **version 0.0.9** — The Endless Tide. The player AUTO-CASTS Fireball at
 the nearest enemy; on level-up the game pauses and offers three rarity-weighted
 spell upgrades. Separately from character EXP, killing enemies with an element's
 magic grants **Affinity EXP** to that element (Fire starts unlocked; Water/Air/
@@ -114,18 +113,38 @@ etherfall/
       whether a Fire Awakening is ready to trigger**). The bottom-left HUD shows
       the live affinity list (e.g. 🔥 Fire Lv12 ✦ / 💧 Water Locked), where ✦
       marks an Awakened element.
-   10. **AwakeningSystem** (v0.0.8) is a one-time, permanent milestone per element.
-       When **Fire Affinity ≥ 10** AND **Character Level ≥ 10**, gameplay briefly
-       freezes for a cinematic (fading music, slight desaturation, a glowing magic
-       circle + embers under the player, slight zoom, small shake, awakening
-       sound, and the line *"The Flame has acknowledged your existence." / 🔥 Fire
-       Awakening*). The reward is deliberately visual, not a stat spike: **Burn is
-       unlocked** (small DoT + unique flame particles), the **Fireball trail
-       brightens**, its **sprite gets a subtle upgrade**, and the **UI icon gains
-       an awakened ✦ mark**. Awakening state persists via the `awakenings` save
-       section; Water/Air/Earth are declared (future), and **Spirit is a hidden
-       placeholder that never triggers or reveals anything**. A new **AWAKENINGS**
-       Codex page tracks each element's unlocked/locked state.
+    10. **AwakeningSystem** (v0.0.8) is a one-time, permanent milestone per element.
+        When **Fire Affinity ≥ 10** AND **Character Level ≥ 10**, gameplay briefly
+        freezes for a cinematic (fading music, slight desaturation, a glowing magic
+        circle + embers under the player, slight zoom, small shake, awakening
+        sound, and the line *"The Flame has acknowledged your existence." / 🔥 Fire
+        Awakening*). The reward is deliberately visual, not a stat spike: **Burn is
+        unlocked** (small DoT + unique flame particles), the **Fireball trail
+        brightens**, its **sprite gets a subtle upgrade**, and the **UI icon gains
+        an awakened ✦ mark**. Awakening state persists via the `awakenings` save
+        section; Water/Air/Earth are declared (future), and **Spirit is a hidden
+        placeholder that never triggers or reveals anything**. A new **AWAKENINGS**
+        Codex page tracks each element's unlocked/locked state.
+    11. **WeatherSystem** (v0.0.9) drives a living world. Rain, ashfall, and fog
+        fade in/out gradually (no sudden pop-in) and carry gameplay modifiers:
+        rain boosts Water affinity gain and weakens Fire, ashfall boosts Fire and
+        slows Water projectiles, fog slows enemy movement. The WeatherSystem emits
+        events the scene listens to for future music/VFX hooks.
+    12. **WorldTreeSystem** (v0.0.9) tracks the Ancient Forces' recognition of the
+        Vessel. Fire starts acknowledged; Water is discovered through the **Water
+        Discovery Event**; Air/Earth await future triggers; Spirit remains hidden.
+        The Codex's World Tree tab renders animated growing branches and glowing
+        nodes for discovered forces, with an "ACKNOWLEDGED" badge for those the
+        Vessel has truly bonded with.
+    13. **Water Discovery Event** (v0.0.9) fires once the Vessel has proven
+        themselves: Character Level ≥ 10, Fire Affinity ≥ 10, Fire Awakening
+        complete, and the world is raining. The rain intensifies, soft blue light
+        washes the screen, water particles orbit the player, and the text *"The
+        Endless Tide accepts your reflection." / Water Discovered* appears. This
+        unlocks the **Water element**, **Water Affinity** (separate progression,
+        max 50), **Water Bolt** (higher speed, pierces one enemy, blue ripple
+        trail and splash impact), the **World Tree branch**, and the Codex entry.
+        Until this event triggers, Water Bolt NEVER appears in level-up choices.
 
 ## Future systems (architecture is ready)
 

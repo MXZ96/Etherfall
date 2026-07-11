@@ -17,6 +17,7 @@ export class CodexScene extends Phaser.Scene {
 
   create() {
     this.codex = this.registry.get("codex");
+    this.worldTree = this.registry.get("worldTree");
     this.ui = new CodexUI(this, this.codex, () => this.resumeGame());
     this.ui.show();
 

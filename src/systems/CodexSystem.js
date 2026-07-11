@@ -17,6 +17,7 @@ const CODEX_CATEGORIES = [
   "spells",
   "enemies",
   "awakenings",
+  "forces",
   "fusions",
   "achievements",
   "artifacts",
@@ -69,6 +70,10 @@ export class CodexSystem {
       this.catalogue.awakenings = data.awakenings.awakenings.filter(
         (a) => !a.hidden
       );
+    }
+    if (data.worldtree && data.worldtree.forces) {
+      // Spirit is hidden — the World Tree only reveals encountered forces.
+      this.catalogue.forces = data.worldtree.forces.filter((f) => !f.hidden);
     }
 
     // Auto-discover starter element / spells on first run.

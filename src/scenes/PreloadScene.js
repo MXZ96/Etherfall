@@ -24,6 +24,7 @@ const DATA_FILES = [
   "upgrades",
   "affinity",
   "awakenings",
+  "worldtree",
 ];
 
 export class PreloadScene extends Phaser.Scene {
