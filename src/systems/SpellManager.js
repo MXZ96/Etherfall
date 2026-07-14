@@ -47,10 +47,16 @@ export class SpellManager {
     this.cooldowns = {}; // spellId -> remaining ms (HUD/debug surface)
 
     this.areaActiveSpells = {}; // spellId -> true while an AreaSpell instance exists
+  }
 
-    scene.game.events.on(EVENTS.SPELL_EXPIRED, (spellId) => {
-      delete this.areaActiveSpells[spellId];
-    });
+  /**
+   * Handle an area spell expiring. Called via the global game bus so the
+   * listener can be owned/cleaned by the RuntimeSystem (avoids leaking a
+   * persistent listener across runs).
+   * @param {string} spellId
+   */
+  handleSpellExpired(spellId) {
+    delete this.areaActiveSpells[spellId];
   }
 
   /** Find a registered spell by id. */

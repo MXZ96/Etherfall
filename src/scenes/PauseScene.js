@@ -6,6 +6,7 @@
 
 import * as Phaser from "phaser";
 import { GAME, SCENES } from "../config/constants.js";
+import { showConfirmation } from "../ui/ConfirmationDialog.js";
 
 export class PauseScene extends Phaser.Scene {
   constructor() {
@@ -33,6 +34,7 @@ export class PauseScene extends Phaser.Scene {
       this.settings.toggleFullscreen();
     });
     this.makeButton(cx, cy + 140, "QUIT TO MENU", () => this.quit());
+    this.makeButton(cx, cy + 200, "RESET PROGRESSION", () => this.confirmReset());
 
     this.input.keyboard.on("keydown-ESC", () => this.resumeGame());
     this.input.keyboard.on("keydown-P", () => this.resumeGame());
@@ -63,6 +65,34 @@ export class PauseScene extends Phaser.Scene {
   }
 
   quit() {
+    this.scene.stop(SCENES.GAME);
+    this.scene.start(SCENES.MAIN_MENU);
+    this.scene.stop();
+  }
+
+  /** Ask for confirmation, then wipe progression mid-run. */
+  confirmReset() {
+    showConfirmation(this, {
+      title: "Reset Progression",
+      message: "Reset all Etherfall progression?\nThis cannot be undone.",
+      confirmLabel: "Reset",
+      cancelLabel: "Cancel",
+      cancelKeys: [],
+      onConfirm: () => this.resetProgression(),
+    });
+  }
+
+  /**
+   * Destroy the active run safely (GameScene's shutdown tears down all runtime
+   * objects), recreate a fresh save (settings preserved), and return to the
+   * main menu. A following New Game behaves like a first-time player.
+   */
+  resetProgression() {
+    const settings = this.registry.get("settings");
+    const save = this.registry.get("save");
+    const currentSettings = settings ? { ...settings.values } : undefined;
+    save.resetProgression(currentSettings);
+
     this.scene.stop(SCENES.GAME);
     this.scene.start(SCENES.MAIN_MENU);
     this.scene.stop();

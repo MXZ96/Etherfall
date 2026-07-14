@@ -41,6 +41,7 @@ import { CodexSystem } from "../systems/CodexSystem.js";
 import { AwakeningSystem } from "../systems/AwakeningSystem.js";
 import { WeatherSystem } from "../systems/WeatherSystem.js";
 import { WorldTreeSystem } from "../systems/WorldTreeSystem.js";
+import { RuntimeSystem } from "../systems/RuntimeSystem.js";
 import { DiscoveryEventUI } from "../ui/DiscoveryEventUI.js";
 import { HUD } from "../ui/HUD.js";
 import { LevelUpUI } from "../ui/LevelUpUI.js";
@@ -56,6 +57,14 @@ export class GameScene extends Phaser.Scene {
     this.settings = this.registry.get("settings");
     this.audio = this.registry.get("audio");
 
+    // --- Runtime lifecycle (v0.1.0) ---
+    // Owns ONLY temporary run data. The permanent SaveSystem is passed in as a
+    // read-only anchor so the two systems never mix. Everything created below
+    // is registered with it and torn down on shutdown (see cleanupRun()).
+    this.runtime = new RuntimeSystem(this, this.save);
+
+    // Guarantee every run begins in an identical runtime state.
+    this.resetRuntimeState();
     // --- Content from data/*.json ---
     const data = this.registry.get("data") || {};
     const mapDef =
@@ -111,11 +120,11 @@ export class GameScene extends Phaser.Scene {
     );
 
     // --- Enemies (physics group = pooling + overlap target) ---
-    this.enemies = this.physics.add.group({
+    this.enemies = this.runtime.trackGroup(this.physics.add.group({
       classType: Enemy,
       runChildUpdate: false,
       maxSize: 300,
-    });
+    }));
     this.enemyManager = new EnemyManager(this, this.player, this.enemies, this.enemyDefs);
     this.enemyManager.setLevel(this.levelSystem.getLevel());
 
@@ -125,26 +134,24 @@ export class GameScene extends Phaser.Scene {
     // Enemy-vs-enemy separation: a physics collider (broadphase-backed, so it
     // scales to hundreds of entities) stops them stacking into one blob and
     // makes them flow around each other like a swarm.
-    this.physics.add.collider(this.enemies, this.enemies);
+    this.enemyCollider = this.runtime.trackCollider(
+      this.physics.add.collider(this.enemies, this.enemies)
+    );
 
     // Player vs enemies overlap (contact damage both ways).
-    this.physics.add.overlap(
-      this.player,
-      this.enemies,
-      this.onPlayerEnemyOverlap,
-      null,
-      this
+    this.playerEnemyOverlap = this.runtime.trackCollider(
+      this.physics.add.overlap(this.player, this.enemies, this.onPlayerEnemyOverlap, null, this)
     );
 
     // --- Projectiles (pooled magic shots) + auto-attack ---
-    this.projectiles = this.physics.add.group({
+    this.projectiles = this.runtime.trackGroup(this.physics.add.group({
       classType: Projectile,
       runChildUpdate: false,
       maxSize: PROJECTILE_POOL,
-    });
+    }));
 
     // --- Area spells (Water Circle, future AoE effects) ---
-    this.areaSpells = [];
+    this.areaSpells = this.runtime.trackArray([], (a) => { if (a && a.despawn) a.despawn(); });
 
     this.magicSystem = new SpellManager(
       this,
@@ -154,13 +161,20 @@ export class GameScene extends Phaser.Scene {
       this.damageSystem,
       this.elementColors
     );
+
+    // Area-spell expiry is a temporary, run-scoped event. Route it through the
+    // RuntimeSystem so the listener is created and removed with the run (no
+    // cross-run leak on the global game bus).
+    this.runtime.trackListener(this.game.events, EVENTS.SPELL_EXPIRED, (spellId) => {
+      this.magicSystem.handleSpellExpired(spellId);
+    });
+
+    // Reset transient runtime state (cooldowns / flags) when the run ends.
+    this.runtime.trackStateReset(() => { this.spellCooldowns = {}; });
+
     // Projectile vs enemy overlap: damage + hit effect, then despawn shot.
-    this.physics.add.overlap(
-      this.projectiles,
-      this.enemies,
-      this.onProjectileHitEnemy,
-      null,
-      this
+    this.projectileEnemyOverlap = this.runtime.trackCollider(
+      this.physics.add.overlap(this.projectiles, this.enemies, this.onProjectileHitEnemy, null, this)
     );
 
     // --- Spell progression (level-up upgrades) ---
@@ -221,9 +235,9 @@ export class GameScene extends Phaser.Scene {
 
     // --- Burn particle emitter (shared, self-cleaning) ---
     // Small upward flame puffs emitted on burning enemies. Created once and
-    // reused; never leaks because it is a single persistent emitter.
-    this.burnEmitter = this.add
-      .particles(0, 0, TEXTURE_KEYS.PROJECTILE, {
+    // reused; registered with the runtime so it is destroyed on run end.
+    this.burnEmitter = this.runtime.trackEmitter(
+      this.add.particles(0, 0, TEXTURE_KEYS.PROJECTILE, {
         speed: { min: 12, max: 38 },
         angle: { min: 250, max: 290 },
         scale: { start: 0.35, end: 0 },
@@ -233,7 +247,8 @@ export class GameScene extends Phaser.Scene {
         tint: this.elementColors.fire ?? 0xff5a2c,
         emitting: false,
       })
-      .setDepth(7);
+      .setDepth(7)
+    );
 
     // --- Event wiring ---
     this.game.events.on(EVENTS.LEVEL_UP, this.onLevelUp, this);
@@ -276,6 +291,10 @@ export class GameScene extends Phaser.Scene {
       velX: Math.round(this.player.body.velocity.x),
       velY: Math.round(this.player.body.velocity.y),
       colliding: this.player.isInvincible(),
+      // Dash (v0.1.0) — readiness for the HUD/debug.
+      dashReady: this.player.canDash(this.time.now),
+      dashActive: this.player.isDashing(this.time.now),
+      dashCdMs: this.player.getDashCooldownRemaining(this.time.now),
       // Magic / projectiles (HUD + debug)
       magicName: this.magicSystem.ownedMagics[0]?.name || "—",
       magicElement: this.magicSystem.ownedMagics[0]?.element || "",
@@ -372,6 +391,14 @@ export class GameScene extends Phaser.Scene {
     // Player movement (eased).
     const v = this.inputMgr.getMoveVector();
     this.player.setMoveInput(v);
+
+    // Dash (SPACE): an immediate, responsive burst with i-frames. Triggered here
+    // (after the move input is set so the dash uses the current heading) and
+    // before tick() so the burst velocity takes hold this frame.
+    if (this.inputMgr.isDashJustDown() && !this.leveling && !this.awakening) {
+      this.player.startDash(this.time.now);
+    }
+
     this.player.tick(delta);
 
     // Enemy spawning + movement.
@@ -1290,5 +1317,44 @@ export class GameScene extends Phaser.Scene {
     this.game.events.off(EVENTS.WEATHER_CHANGED, this.onWeatherChanged, this);
     this.game.events.off(EVENTS.FORCE_DISCOVERED, this.onForceDiscovered, this);
     this.game.events.off(EVENTS.FORCE_ACKNOWLEDGED, this.onForceAcknowledged, this);
+
+    // Destroy every temporary runtime object before the scene restarts. This is
+    // the single point where the run lifecycle ends (Feature 4: Game Over
+    // Cleanup). The RuntimeSystem owns the actual teardown.
+    this.cleanupRun();
+  }
+
+  // ------------------------------------------------------------------------
+  // Run lifecycle (v0.1.0) — Runtime / Save separation
+  // ------------------------------------------------------------------------
+
+  /**
+   * Zero all transient run state so a fresh run always begins identically.
+   * Called at the top of create(); the run-specific fields are (re)assigned
+   * again below, so this guarantees a clean, deterministic starting point.
+   */
+  resetRuntimeState() {
+    this.leveling = false;
+    this.awakening = false;
+    this.runTime = 0;
+    this.damageEvents = 0;
+    this.spellCooldowns = {};
+    this.waterDiscoveryTriggered = false;
+    if (this.player) {
+      this.player.dashing = false;
+      this.player.dashCooldownUntil = 0;
+    }
+  }
+
+  /**
+   * Tear down everything temporary to the current run (Feature 2 & 4). The
+   * RuntimeSystem destroys tracked objects in order: physics colliders/overlaps,
+   * pooled groups (projectiles + enemies), area spells, particle emitters,
+   * temporary listeners, and finally state resets. Permanent progression (save,
+   * affinity, world tree, codex) is never touched here.
+   */
+  cleanupRun() {
+    if (this.runtime) this.runtime.reset();
+    this.runtime = null;
   }
 }

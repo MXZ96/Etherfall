@@ -138,4 +138,24 @@ export class SaveSystem {
     this.data = defaultSave();
     return this.save();
   }
+
+  /**
+   * Reset ONLY persistent progression, leaving user settings untouched.
+   * Recreates a fresh save document (same shape as defaultSave) but carries
+   * over the provided current settings so resolution / volume / key bindings
+   * are preserved.
+   *
+   * Safety: this method ONLY ever rewrites Etherfall's own save key in
+   * localStorage. It never touches the filesystem, project folders, source
+   * code, git, or anything outside the Etherfall save blob.
+   * @param {object} [currentSettings] settings to preserve (e.g. SettingsSystem.values)
+   */
+  resetProgression(currentSettings) {
+    const fresh = defaultSave();
+    if (currentSettings && typeof currentSettings === "object") {
+      fresh.settings = { ...fresh.settings, ...currentSettings };
+    }
+    this.data = fresh;
+    return this.save();
+  }
 }

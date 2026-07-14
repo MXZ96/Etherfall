@@ -32,6 +32,10 @@ export class InputManager {
       esc: Phaser.Input.Keyboard.KeyCodes.ESC,
       p: Phaser.Input.Keyboard.KeyCodes.P,
     });
+
+    // Dash key (SPACE). Prevent the page from scrolling on press.
+    kb.addCapture(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    this.dashKey = kb.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
   }
 
   /**
@@ -56,5 +60,10 @@ export class InputManager {
       Phaser.Input.Keyboard.JustDown(this.pauseKeys.esc) ||
       Phaser.Input.Keyboard.JustDown(this.pauseKeys.p)
     );
+  }
+
+  /** True once when SPACE is pressed (edge-triggered) — triggers the Dash. */
+  isDashJustDown() {
+    return Phaser.Input.Keyboard.JustDown(this.dashKey);
   }
 }

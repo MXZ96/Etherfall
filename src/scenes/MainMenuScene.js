@@ -7,6 +7,7 @@
 
 import * as Phaser from "phaser";
 import { GAME, SCENES } from "../config/constants.js";
+import { showConfirmation } from "../ui/ConfirmationDialog.js";
 
 export class MainMenuScene extends Phaser.Scene {
   constructor() {
@@ -24,7 +25,7 @@ export class MainMenuScene extends Phaser.Scene {
       fontStyle: "bold",
     }).setOrigin(0.5);
 
-    this.add.text(cx, cy - 90, "a bullet-heaven roguelite", {
+    this.add.text(cx, cy - 100, "a bullet-heaven roguelite", {
       fontFamily: "Segoe UI, sans-serif",
       fontSize: "18px",
       color: "#9d86ff",
@@ -33,19 +34,21 @@ export class MainMenuScene extends Phaser.Scene {
     this.save = this.registry.get("save");
     this.settings = this.registry.get("settings");
 
-    // Main buttons. START RUN is always shown; CONTINUE only when a save exists.
-    const buttons = [];
-    buttons.push(this.makeButton(cx, cy - 10, "START RUN", () => this.startRun()));
+    // Vertical button column. START RUN is always shown; CONTINUE only when a
+    // save exists. RESET PROGRESSION is always available.
+    const hasSave = !!(this.save && this.save.hasSave());
+    const actions = [{ label: "START RUN", cb: () => this.startRun() }];
+    if (hasSave) actions.push({ label: "CONTINUE", cb: () => this.startRun() });
+    actions.push({ label: "SETTINGS", cb: () => this.toggleSettings() });
+    actions.push({ label: "RESET PROGRESSION", cb: () => this.confirmReset() });
 
-    if (this.save && this.save.hasSave()) {
-      buttons.push(this.makeButton(cx, cy + 50, "CONTINUE", () => this.startRun()));
-    }
+    let by = cy - 50;
+    actions.forEach((a) => {
+      this.makeButton(cx, by, a.label, a.cb);
+      by += 56;
+    });
 
-    buttons.push(
-      this.makeButton(cx, cy + (this.save && this.save.hasSave() ? 110 : 50), "SETTINGS", () => this.toggleSettings())
-    );
-
-    this.add.text(cx, cy + 170,
+    this.add.text(cx, cy + 172,
       "Move: WASD / Arrow Keys     Pause: ESC or P     Debug: F1",
       {
         fontFamily: "Segoe UI, sans-serif",
@@ -101,6 +104,29 @@ export class MainMenuScene extends Phaser.Scene {
 
   toggleSettings() {
     this.settingsPanel.setVisible(!this.settingsPanel.visible);
+  }
+
+  /** Ask for confirmation, then wipe progression (settings preserved). */
+  confirmReset() {
+    showConfirmation(this, {
+      title: "Reset Progression",
+      message: "Reset all Etherfall progression?\nThis cannot be undone.",
+      confirmLabel: "Reset",
+      cancelLabel: "Cancel",
+      cancelKeys: ["ESC"],
+      onConfirm: () => this.resetProgression(),
+    });
+  }
+
+  /**
+   * Recreate a completely fresh save. Only the game's own save data is
+   * overwritten; current user settings (resolution / volume / bindings) are
+   * carried over. Stays on the menu — a following New Game starts like a
+   * first-time player.
+   */
+  resetProgression() {
+    const currentSettings = this.settings ? { ...this.settings.values } : undefined;
+    this.save.resetProgression(currentSettings);
   }
 
   startRun() {

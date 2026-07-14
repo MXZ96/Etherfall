@@ -67,6 +67,10 @@ export class HUD {
     this.levelText = scene.add.text(MARGIN, 66, "", { ...base, fontSize: "16px", color: "#9d86ff" })
       .setScrollFactor(0).setDepth(1001);
 
+    // Dash status (under the level text).
+    this.dashText = scene.add.text(MARGIN, 90, "", { ...base, fontSize: "14px", color: "#7fd4ff" })
+      .setScrollFactor(0).setDepth(1001);
+
     // Top-right texts (right-aligned to the screen edge)
     const rx = GAME.WIDTH - MARGIN;
     this.timerText = scene.add.text(rx, 8, "", right)
@@ -144,6 +148,7 @@ export class HUD {
     // --- Top-left text ---
     this.hpText.setText(`HP ${Math.ceil(s.hp)} / ${s.maxHp}`);
     this.levelText.setText(`LVL ${s.level}`);
+    this.dashText.setText(this.formatDash(s));
 
     // --- Top-right text ---
     this.timerText.setText(`TIME ${this.formatTime(s.timeMs)}`);
@@ -163,6 +168,15 @@ export class HUD {
     if (s.debug) {
       this.debugText.setText(this.formatDebug(s));
     }
+  }
+
+  /** Render the dash status (SPACE): ready, on cooldown, or dashing. */
+  formatDash(s) {
+    if (!s) return "";
+    if (s.dashActive) return "DASH ►";
+    if (s.dashReady) return "DASH READY";
+    const secs = ((s.dashCdMs || 0) / 1000).toFixed(1);
+    return `DASH ${secs}s`;
   }
 
   /** Render the owned-spell list (name, state, cooldown/duration). */

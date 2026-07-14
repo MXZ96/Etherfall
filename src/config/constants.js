@@ -47,6 +47,17 @@ export const COMBAT = {
   CONTACT_DAMAGE_FALLBACK: 5, // used if player.json omits contactDamage
 };
 
+// Player Dash (v0.1.0). A short, high-speed burst triggered by SPACE with a
+// cooldown and temporary i-frames. The burst speed is ~3x the player's normal
+// movement speed (PLAYER.SPEED = 200) over a short window so the distance feels
+// impactful but controlled.
+export const DASH = {
+  COOLDOWN_MS: 1500, // time between dashes
+  DURATION_MS: 160, // length of the burst
+  SPEED: 640, // burst speed in px/s (~3.2x PLAYER.SPEED)
+  IFRAME_MS: 220, // invulnerability window (covers the whole burst + buffer)
+};
+
 // Enemy spawning tuning (used by EnemyManager).
 export const SPAWN = {
   MARGIN: 80, // px outside the camera view where enemies appear

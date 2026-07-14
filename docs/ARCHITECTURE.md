@@ -99,6 +99,37 @@ saves keep loading.
 - Floating **damage numbers** are spawned from the `combat:damage-dealt` event
   (works for any target), coloured by element.
 
+## Runtime vs. Save — the two-layer split (v0.1.0)
+
+Etherfall deliberately separates **permanent** progression from **temporary**
+run state. Mixing the two was the single biggest source of cross-run bugs, so
+both now have a single, dedicated owner:
+
+- **`SaveSystem` owns permanent data only** — element unlocks, affinity,
+  World Tree recognition, Arcane Codex, statistics, and the versioned save blob
+  in localStorage. It is created once in `BootScene`, lives on the registry, and
+  is *never* written to by run logic.
+- **`RuntimeSystem` owns temporary data only** — spell cooldowns, active spell
+  instances, projectiles, area spells, physics colliders/overlaps, particle
+  emitters, timers, runtime arrays, temporary event listeners and state flags.
+  It is created fresh in `GameScene.create()` and receives the `SaveSystem` only
+  as a read-only anchor (so the seam is explicit, never crossed).
+
+The run lifecycle is now a clean pair of methods on `GameScene`:
+
+- `resetRuntimeState()` runs at the top of `create()` and zeroes every transient
+  field, so **every new run begins in an identical runtime state**.
+- `cleanupRun()` runs inside `onShutdown()` (before Phaser's own sweep) and calls
+  `RuntimeSystem.reset()`, which destroys tracked objects in order, clears every
+  runtime array, resets cooldowns, and removes every temporary `game.events`
+  listener. Because the SHUTDOWN handler fires *before* Phaser tears the scene
+  down, nothing temporary (and crucially no global listener) can leak into the
+  next run.
+
+This is why starting a second run behaves exactly like the first, with no
+accumulated listeners or stale runtime objects — the prerequisite for adding
+Air, Earth, Spirit, Fusion and Bosses later.
+
 ## Performance notes
 
 - Both enemies and projectiles use **pooled physics groups** (no per-frame

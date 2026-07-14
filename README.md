@@ -1,7 +1,8 @@
 # Etherfall
 
 A browser **Bullet-Heaven Roguelite** (top-down action RPG) built with **Phaser 3**
-and **vanilla ES Modules**. This repository is **version 0.0.9** — The Endless Tide. The player AUTO-CASTS Fireball at
+and **vanilla ES Modules**. This repository is **version 0.1.0** — Dash & Runtime
+Foundation. The player AUTO-CASTS Fireball at
 the nearest enemy; on level-up the game pauses and offers three rarity-weighted
 spell upgrades. Separately from character EXP, killing enemies with an element's
 magic grants **Affinity EXP** to that element (Fire starts unlocked; Water/Air/
@@ -38,6 +39,7 @@ an [import map](index.html) from a CDN.
 | Action | Keys |
 | ------ | ---- |
 | Move   | `W A S D` or Arrow Keys |
+| Dash   | `Space` (1.5s cooldown, i-frames) |
 | Pause  | `Esc` or `P` |
 | Debug: gain EXP (test level-up) | `E` |
 
@@ -105,7 +107,14 @@ etherfall/
      appears only when a valid save exists (`SaveSystem.hasSave()`). The save
      document already reserves `progress` (highestLevel, unlockedElements,
      discoveredSpells, achievements) for a future full save system.
-   9. **PauseScene** (Esc/P) overlays resume / fullscreen / quit options.
+   9. **PauseScene** (Esc/P) overlays resume / fullscreen / quit options. Both
+      the Main Menu and the Pause overlay expose **RESET PROGRESSION** (behind a
+      confirmation dialog): it wipes all persistent progression — Arcane Codex,
+      World Tree, element/affinity discoveries, awakenings, achievements, highest
+      level, unlocks — while preserving user **settings** (volume, resolution,
+      bindings), then recreates a fresh save so the next run plays like a
+      first-time player. Reset only ever rewrites Etherfall's own save key in
+      localStorage; it never touches project files or anything outside the save.
       Press **F1** for the debug overlay (character level, per-element affinity
       levels + Spirit status, entities, enemies, HP, velocity, collision, owned
       spells + levels, per-spell multipliers, upgrade stacks, enemy scale,
@@ -145,6 +154,20 @@ etherfall/
         max 50), **Water Bolt** (higher speed, pierces one enemy, blue ripple
         trail and splash impact), the **World Tree branch**, and the Codex entry.
         Until this event triggers, Water Bolt NEVER appears in level-up choices.
+    14. **Dash & Runtime Foundation** (v0.1.0) is a stability update, not new
+        content. The player gains a **Dash** (`Space`): an immediate, ~3x burst
+        toward the current (or last) movement direction with a 1.5s cooldown and
+        temporary i-frames, so it slips through enemy contact damage. Under the
+        hood, a dedicated **RuntimeSystem** now owns every piece of *temporary*
+        run state — spell cooldowns, projectiles, area spells, physics
+        colliders/overlaps, particle emitters, runtime arrays, timers, temporary
+        listeners and state flags — and tears it all down the instant a run ends.
+        **SaveSystem** remains the single owner of *permanent* progression
+        (element unlocks, affinity, world tree, codex, statistics, save blob).
+        The two never mix, so every new run starts in an identical runtime state
+        with no cross-run leaks (no console warnings, no accumulated global
+        listeners). This is the foundation future elements, bosses and fusions
+        build on.
 
 ## Future systems (architecture is ready)
 
